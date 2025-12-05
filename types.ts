@@ -29,7 +29,7 @@ export interface StockLog {
   date: string;
   productId: string;
   productName: string;
-  action: 'SALE' | 'RECEIVE' | 'ADJUST' | 'RETURN';
+  action: 'SALE' | 'RECEIVE' | 'ADJUST' | 'RETURN' | 'TRANSFER_IN' | 'TRANSFER_OUT';
   quantity: number;
   staffName: string;
   note?: string;
@@ -66,6 +66,8 @@ export interface Product {
   defaultInstruction?: string; // Standard dosage instructions
 }
 
+export type MembershipTier = 'MEMBER' | 'SILVER' | 'GOLD' | 'PLATINUM';
+
 export interface Customer {
   id: string;
   name: string;
@@ -74,6 +76,7 @@ export interface Customer {
   totalSpent: number;
   lastVisit: string;
   allergies?: string[];
+  tier?: MembershipTier; // Computed usually
 }
 
 export interface CartItem extends Product {
@@ -153,6 +156,18 @@ export interface Branch {
   type: 'HQ' | 'BRANCH';
 }
 
+export interface TransferRequest {
+    id: string;
+    date: string;
+    fromBranchId: string;
+    toBranchId: string;
+    productId: string;
+    productName: string;
+    quantity: number;
+    status: 'PENDING' | 'APPROVED' | 'COMPLETED' | 'REJECTED';
+    requestedBy: string;
+}
+
 export interface Shift {
   id: string;
   staffName: string;
@@ -191,6 +206,7 @@ export interface GlobalState {
   shiftHistory: Shift[];
   settings: Settings;
   heldBills: HeldBill[];
+  transfers: TransferRequest[];
 }
 
 export type Action =
@@ -212,4 +228,5 @@ export type Action =
   | { type: 'RESUME_BILL'; payload: string } 
   | { type: 'DELETE_HELD_BILL'; payload: string }
   | { type: 'UPDATE_CART_INSTRUCTION'; payload: { productId: string; instruction: string } }
-  | { type: 'LOG_SYSTEM_EVENT'; payload: Omit<SystemLog, 'id' | 'timestamp'> };
+  | { type: 'LOG_SYSTEM_EVENT'; payload: Omit<SystemLog, 'id' | 'timestamp'> }
+  | { type: 'REQUEST_TRANSFER'; payload: TransferRequest };

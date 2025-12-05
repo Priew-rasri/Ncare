@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { GlobalState } from '../types';
-import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight, TrendingUp, PieChart } from 'lucide-react';
+import { GlobalState, TransferRequest } from '../types';
+import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight, TrendingUp, PieChart, Truck, ArrowLeftRight } from 'lucide-react';
 
 interface InventoryProps {
   data: GlobalState;
@@ -9,7 +9,7 @@ interface InventoryProps {
 }
 
 const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
-  const [activeTab, setActiveTab] = useState<'STOCK' | 'MOVEMENT' | 'EXPIRY' | 'VALUATION'>('STOCK');
+  const [activeTab, setActiveTab] = useState<'STOCK' | 'MOVEMENT' | 'TRANSFERS' | 'EXPIRY' | 'VALUATION'>('STOCK');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   
   // Adjustment Modal State
@@ -17,6 +17,12 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
   const [adjustProductId, setAdjustProductId] = useState('');
   const [adjustQty, setAdjustQty] = useState(0);
   const [adjustReason, setAdjustReason] = useState('Damaged Stock');
+
+  // Transfer Modal State
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferProductId, setTransferProductId] = useState('');
+  const [transferToBranch, setTransferToBranch] = useState('');
+  const [transferQty, setTransferQty] = useState(0);
 
   const toggleRow = (id: string) => {
     setExpandedRow(expandedRow === id ? null : id);
@@ -38,6 +44,29 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
     setAdjustQty(0);
   };
 
+  const handleRequestTransfer = () => {
+      if(!transferProductId || !transferToBranch || transferQty <= 0) return;
+      const product = data.inventory.find(p => p.id === transferProductId);
+      
+      const newTransfer: TransferRequest = {
+          id: `TR-${Date.now().toString().substr(-6)}`,
+          date: new Date().toLocaleDateString('en-CA'),
+          fromBranchId: data.currentBranch.id,
+          toBranchId: transferToBranch,
+          productId: transferProductId,
+          productName: product?.name || 'Unknown',
+          quantity: transferQty,
+          status: 'PENDING',
+          requestedBy: data.currentUser?.name || 'Admin'
+      };
+
+      dispatch({ type: 'REQUEST_TRANSFER', payload: newTransfer });
+      setShowTransferModal(false);
+      setTransferProductId('');
+      setTransferQty(0);
+      setTransferToBranch('');
+  };
+
   const getStatusBadge = (stock: number, min: number) => {
     if (stock === 0) return <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full text-xs font-bold flex items-center w-fit gap-1 border border-red-100"><AlertTriangle className="w-3 h-3" /> Out of Stock</span>;
     if (stock <= min) return <span className="bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-xs font-bold flex items-center w-fit gap-1 border border-orange-100"><AlertTriangle className="w-3 h-3" /> Low Stock</span>;
@@ -53,6 +82,9 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
              <input type="text" placeholder="Search product name, lot number..." className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700" />
           </div>
           <div className="flex gap-2">
+             <button onClick={() => setShowTransferModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-100 rounded-lg text-sm font-bold text-blue-700 hover:bg-blue-100 shadow-sm">
+                <Truck className="w-4 h-4" /> Request Transfer
+             </button>
              <button onClick={() => setShowAdjustModal(true)} className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-900 rounded-lg text-sm font-bold text-white hover:bg-slate-800 shadow-md">
                 <Settings className="w-4 h-4" /> Stock Adjustment
              </button>
@@ -217,6 +249,61 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
     </div>
   );
 
+  const renderTransfers = () => (
+      <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <div>
+                   <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2"><ArrowLeftRight className="w-5 h-5 text-blue-500"/> Inter-Branch Transfers</h3>
+                   <p className="text-xs text-slate-400 mt-1">Manage inbound and outbound stock requests between branches.</p>
+              </div>
+          </div>
+          <table className="w-full text-sm text-left">
+              <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase text-slate-500">
+                  <tr>
+                      <th className="px-6 py-4 font-bold">ID / Date</th>
+                      <th className="px-6 py-4 font-bold">Route</th>
+                      <th className="px-6 py-4 font-bold">Product</th>
+                      <th className="px-6 py-4 font-bold text-right">Qty</th>
+                      <th className="px-6 py-4 font-bold text-center">Status</th>
+                      <th className="px-6 py-4 font-bold">Requested By</th>
+                  </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                  {data.transfers.map(t => (
+                      <tr key={t.id} className="hover:bg-slate-50">
+                          <td className="px-6 py-4">
+                              <div className="font-bold text-blue-600 text-xs font-mono">{t.id}</div>
+                              <div className="text-slate-500 text-xs">{t.date}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                              <div className="flex items-center gap-2 text-xs">
+                                  <span className="bg-slate-100 px-2 py-1 rounded font-bold text-slate-600">{t.fromBranchId}</span>
+                                  <ArrowRight className="w-3 h-3 text-slate-400" />
+                                  <span className="bg-blue-50 px-2 py-1 rounded font-bold text-blue-600">{t.toBranchId}</span>
+                              </div>
+                          </td>
+                          <td className="px-6 py-4 font-medium text-slate-700">{t.productName}</td>
+                          <td className="px-6 py-4 text-right font-bold text-slate-800">{t.quantity}</td>
+                          <td className="px-6 py-4 text-center">
+                              <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${
+                                  t.status === 'COMPLETED' ? 'bg-green-50 text-green-700' :
+                                  t.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700' :
+                                  'bg-slate-100 text-slate-500'
+                              }`}>
+                                  {t.status}
+                              </span>
+                          </td>
+                          <td className="px-6 py-4 text-xs text-slate-500">{t.requestedBy}</td>
+                      </tr>
+                  ))}
+                  {data.transfers.length === 0 && (
+                      <tr><td colSpan={6} className="text-center py-8 text-slate-400">No transfer requests found</td></tr>
+                  )}
+              </tbody>
+          </table>
+      </div>
+  );
+
   const renderExpiryRisk = () => {
       // Flatten inventory to find batches near expiry
       const expiringBatches = data.inventory.flatMap(item => 
@@ -337,9 +424,69 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
 
   return (
     <div className="space-y-6 animate-fade-in pb-10 relative">
+      {/* Transfer Request Modal */}
+      {showTransferModal && (
+          <div className="absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 fixed top-0 left-72 w-[calc(100vw-18rem)] h-screen">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 animate-fade-in border border-slate-100">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <Truck className="w-5 h-5 text-blue-600" /> Request Transfer
+                    </h3>
+                    <button onClick={() => setShowTransferModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+                </div>
+                
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Select Product</label>
+                        <select 
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                            value={transferProductId}
+                            onChange={(e) => setTransferProductId(e.target.value)}
+                        >
+                            <option value="">-- Product to Transfer --</option>
+                            {data.inventory.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Destination Branch</label>
+                         <select 
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                            value={transferToBranch}
+                            onChange={(e) => setTransferToBranch(e.target.value)}
+                        >
+                            <option value="">-- Select Branch --</option>
+                            {data.branches.filter(b => b.id !== data.currentBranch.id).map(b => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Quantity</label>
+                        <input 
+                            type="number" 
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                            placeholder="Amount to send"
+                            value={transferQty}
+                            onChange={(e) => setTransferQty(Number(e.target.value))}
+                        />
+                    </div>
+                    
+                    <div className="flex gap-3 mt-6">
+                        <button onClick={() => setShowTransferModal(false)} className="flex-1 py-3 text-slate-600 font-bold text-sm hover:bg-slate-50 rounded-xl border border-transparent">Cancel</button>
+                        <button onClick={handleRequestTransfer} className="flex-1 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 shadow-lg flex items-center justify-center gap-2">
+                            Send Request
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* Stock Adjustment Modal */}
       {showAdjustModal && (
-        <div className="absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 h-[calc(100vh-100px)] fixed top-0 left-72 w-[calc(100vw-18rem)]">
+        <div className="absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 fixed top-0 left-72 w-[calc(100vw-18rem)] h-screen">
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 animate-fade-in border border-slate-100">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -425,6 +572,12 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                 >
                     Movement History
                 </button>
+                 <button 
+                    onClick={() => setActiveTab('TRANSFERS')}
+                    className={`px-5 py-2 rounded-full text-xs font-bold transition-all ${activeTab === 'TRANSFERS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                    Transfers
+                </button>
                 <button 
                     onClick={() => setActiveTab('EXPIRY')}
                     className={`px-5 py-2 rounded-full text-xs font-bold transition-all ${activeTab === 'EXPIRY' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
@@ -443,6 +596,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
 
       {activeTab === 'STOCK' && renderStockTable()}
       {activeTab === 'MOVEMENT' && renderMovementLog()}
+      {activeTab === 'TRANSFERS' && renderTransfers()}
       {activeTab === 'EXPIRY' && renderExpiryRisk()}
       {activeTab === 'VALUATION' && renderValuation()}
     </div>

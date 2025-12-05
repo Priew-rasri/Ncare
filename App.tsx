@@ -9,9 +9,21 @@ import Accounting from './components/Accounting';
 import AIAssistant from './components/AIAssistant';
 import Settings from './components/Settings';
 import Login from './components/Login';
-import { MOCK_INVENTORY, MOCK_CUSTOMERS, MOCK_SALES, MOCK_PO, MOCK_EXPENSES, MOCK_BRANCHES, MOCK_SUPPLIERS, MOCK_STOCK_LOGS, MOCK_SETTINGS, MOCK_SHIFTS } from './constants';
-import { GlobalState, Action, StockLog, Shift, Customer, SystemLog } from './types';
+import { MOCK_INVENTORY, MOCK_SALES, MOCK_PO, MOCK_EXPENSES, MOCK_BRANCHES, MOCK_SUPPLIERS, MOCK_STOCK_LOGS, MOCK_SETTINGS, MOCK_SHIFTS } from './constants';
+import { GlobalState, Action, StockLog, Shift, Customer, SystemLog, TransferRequest } from './types';
 import { Search, Bell, MapPin, ChevronDown, Menu } from 'lucide-react';
+
+// Enhanced Mock Customers for CRM Demo
+const MOCK_CUSTOMERS_ENHANCED: Customer[] = [
+  { id: 'C001', name: 'คุณสมชาย ใจดี', phone: '081-111-1111', points: 150, totalSpent: 3000, lastVisit: '2024-05-20', allergies: ['Penicillin'] },
+  { id: 'C002', name: 'คุณหญิง รักสุขภาพ', phone: '089-999-9999', points: 1200, totalSpent: 25400, lastVisit: '2024-05-22', allergies: [] },
+  { id: 'C003', name: 'คุณลุง แข็งแรง', phone: '086-555-4444', points: 20, totalSpent: 400, lastVisit: '2024-04-10', allergies: [] },
+  { id: 'C004', name: 'Dr. Strange', phone: '099-888-7777', points: 5000, totalSpent: 120000, lastVisit: '2024-05-25', allergies: ['Sulfa'] },
+];
+
+const MOCK_TRANSFERS: TransferRequest[] = [
+    { id: 'TR-001', date: '2024-05-20', fromBranchId: 'B001', toBranchId: 'B002', productId: 'P001', productName: 'Sara (Paracetamol)', quantity: 50, status: 'COMPLETED', requestedBy: 'Staff B' }
+];
 
 const reducer = (state: GlobalState, action: Action): GlobalState => {
   switch (action.type) {
@@ -259,6 +271,20 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
                 ...action.payload
             }, ...state.systemLogs]
         };
+    
+    case 'REQUEST_TRANSFER':
+        return {
+            ...state,
+            transfers: [action.payload, ...state.transfers],
+            systemLogs: [{
+                id: `SYS-${Date.now()}`,
+                timestamp: new Date().toLocaleString(),
+                actor: action.payload.requestedBy,
+                action: 'STOCK_TRANSFER_REQUEST',
+                details: `Requested ${action.payload.quantity} of ${action.payload.productName} from ${action.payload.fromBranchId}`,
+                severity: 'INFO'
+            }, ...state.systemLogs]
+        };
 
     default:
       return state;
@@ -268,7 +294,7 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
 const initialState: GlobalState = {
   currentUser: null,
   inventory: MOCK_INVENTORY,
-  customers: MOCK_CUSTOMERS,
+  customers: MOCK_CUSTOMERS_ENHANCED,
   sales: MOCK_SALES,
   purchaseOrders: MOCK_PO,
   suppliers: MOCK_SUPPLIERS,
@@ -280,7 +306,8 @@ const initialState: GlobalState = {
   settings: MOCK_SETTINGS,
   activeShift: null,
   shiftHistory: MOCK_SHIFTS,
-  heldBills: []
+  heldBills: [],
+  transfers: MOCK_TRANSFERS
 };
 
 const App: React.FC = () => {
@@ -294,7 +321,9 @@ const App: React.FC = () => {
           try {
               const parsed = JSON.parse(savedState);
               // Ensure we don't load a logged-in user session by default for security
-              dispatch({ type: 'LOAD_STATE', payload: { ...parsed, currentUser: null, activeShift: parsed.activeShift } }); 
+              // Also ensure we have default transfers if missing from persistence
+              const mergedState = { ...parsed, transfers: parsed.transfers || MOCK_TRANSFERS };
+              dispatch({ type: 'LOAD_STATE', payload: { ...mergedState, currentUser: null, activeShift: parsed.activeShift } }); 
           } catch (e) {
               console.error("Failed to load persistence");
           }
