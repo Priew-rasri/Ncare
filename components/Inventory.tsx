@@ -109,6 +109,17 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
           return;
       }
 
+      // Professional Check: Barcode Uniqueness
+      const isDuplicate = data.inventory.some(p => 
+          p.barcode === productForm.barcode && 
+          p.id !== (editingProduct?.id || '')
+      );
+
+      if (isDuplicate) {
+          alert(`Error: Barcode "${productForm.barcode}" is already used by another product.`);
+          return;
+      }
+
       if (editingProduct) {
           // Update
           dispatch({ 
@@ -134,8 +145,18 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
   };
 
   const generateBarcode = () => {
-      const random = Math.floor(Math.random() * 900000000000) + 100000000000;
-      setProductForm(prev => ({ ...prev, barcode: `885${random}` }));
+      let random;
+      let exists = true;
+      // Ensure unique generated barcode
+      while(exists) {
+          random = Math.floor(Math.random() * 900000000000) + 100000000000;
+          const barcode = `885${random}`;
+          // eslint-disable-next-line no-loop-func
+          exists = data.inventory.some(p => p.barcode === barcode);
+          if(!exists) {
+             setProductForm(prev => ({ ...prev, barcode }));
+          }
+      }
   };
 
   const getFilteredInventory = () => {

@@ -111,6 +111,31 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
         setNewPOSupplier('');
     };
 
+    // CSV Export Logic
+    const handleExportTaxCSV = () => {
+        const headers = ['Date', 'Invoice No', 'Vatable Amount', 'VAT Amount (7%)', 'Net Total', 'Exempt Sales'];
+        const rows = data.sales.map(s => [
+            s.date.split(' ')[0],
+            s.id,
+            s.subtotalVatable.toFixed(2),
+            s.vatAmount.toFixed(2),
+            s.netTotal.toFixed(2),
+            s.subtotalExempt.toFixed(2)
+        ]);
+        
+        const csvContent = "data:text/csv;charset=utf-8," 
+            + headers.join(",") + "\n" 
+            + rows.map(e => e.join(",")).join("\n");
+            
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `tax_report_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const renderOverview = () => (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-fade-in">
             <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 p-8 lg:col-span-2">
@@ -427,10 +452,15 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
                              </tfoot>
                          </table>
                          
-                         <div className="mt-8 text-center">
-                             <button onClick={() => window.print()} className="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 mx-auto hover:bg-slate-800 transition-colors">
+                         <div className="mt-8 text-center flex gap-4 justify-center">
+                             <button onClick={() => window.print()} className="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors">
                                  <Printer className="w-4 h-4" /> Print Document
                              </button>
+                             {previewReport === 'TAX' && (
+                                 <button onClick={handleExportTaxCSV} className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700 transition-colors">
+                                     <Download className="w-4 h-4" /> Export to CSV
+                                 </button>
+                             )}
                          </div>
                      </div>
                  </div>

@@ -57,6 +57,10 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   // Prescription Upload State
   const [prescriptionImage, setPrescriptionImage] = useState<string | null>(null);
   
+  // Direct Quantity Edit State
+  const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
+  const [tempQty, setTempQty] = useState('');
+
   // Search Input Ref
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -280,6 +284,30 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     }));
   };
   
+  const handleQtyClick = (item: CartItem) => {
+      setEditingQtyId(item.id);
+      setTempQty(item.quantity.toString());
+  };
+
+  const handleQtyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setTempQty(e.target.value);
+  };
+
+  const saveQty = () => {
+      if (editingQtyId) {
+          const newQty = parseInt(tempQty);
+          if (!isNaN(newQty) && newQty > 0) {
+               const item = cart.find(i => i.id === editingQtyId);
+               if (item && newQty <= item.stock) {
+                   setCart(prev => prev.map(i => i.id === editingQtyId ? { ...i, quantity: newQty } : i));
+               } else if (item) {
+                   alert(`Cannot exceed available stock (${item.stock})`);
+               }
+          }
+      }
+      setEditingQtyId(null);
+  };
+
   const handleHoldBill = () => {
       if (cart.length === 0) return;
       const heldBill: HeldBill = {
@@ -1258,10 +1286,25 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="font-bold text-slate-900 w-16 text-right">฿{(item.price * item.quantity).toLocaleString()}</span>
-                                <div className="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm">
-                                    <button onClick={() => updateQuantity(item.id, -1)} className="p-1 hover:bg-slate-100 rounded-l-lg text-slate-500"><Minus className="w-3 h-3" /></button>
-                                    <button onClick={() => updateQuantity(item.id, 1)} className="p-1 hover:bg-slate-100 rounded-r-lg text-slate-500"><Plus className="w-3 h-3" /></button>
-                                </div>
+                                
+                                {editingQtyId === item.id ? (
+                                    <input 
+                                        type="number"
+                                        value={tempQty}
+                                        onChange={handleQtyChange}
+                                        onBlur={saveQty}
+                                        onKeyDown={(e) => e.key === 'Enter' && saveQty()}
+                                        className="w-16 p-1 text-center border border-blue-500 rounded font-bold text-sm"
+                                        autoFocus
+                                    />
+                                ) : (
+                                    <div className="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm">
+                                        <button onClick={() => updateQuantity(item.id, -1)} className="p-1 hover:bg-slate-100 rounded-l-lg text-slate-500"><Minus className="w-3 h-3" /></button>
+                                        <button onClick={() => handleQtyClick(item)} className="px-2 font-bold text-sm text-slate-700 hover:text-blue-600 w-8 text-center">{item.quantity}</button>
+                                        <button onClick={() => updateQuantity(item.id, 1)} className="p-1 hover:bg-slate-100 rounded-r-lg text-slate-500"><Plus className="w-3 h-3" /></button>
+                                    </div>
+                                )}
+                                
                                 <button onClick={() => removeFromCart(item.id)} className="text-slate-300 hover:text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
                             </div>
                         </div>
