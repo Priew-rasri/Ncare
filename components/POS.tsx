@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { GlobalState, Product, CartItem, SaleRecord, Shift, HeldBill } from '../types';
-import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan, Edit3, Sticker } from 'lucide-react';
 
 interface POSProps {
   state: GlobalState;
@@ -21,7 +21,12 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastSale, setLastSale] = useState<SaleRecord | null>(null);
+  const [showLabelPrint, setShowLabelPrint] = useState(false);
   
+  // Instruction Editor State
+  const [editingInstructionId, setEditingInstructionId] = useState<string | null>(null);
+  const [instructionText, setInstructionText] = useState('');
+
   // QR Payment State
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrAmount, setQrAmount] = useState(0);
@@ -58,7 +63,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state.inventory, cart]); // Re-bind if inventory/cart logic changes (though addToCart inside Effect needs care, for this demo we rely on closure)
+  }, [state.inventory, cart]);
 
 
   const selectedCustomer = useMemo(() => 
@@ -147,10 +152,6 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   };
 
   const addToCart = (product: Product) => {
-    // This function must be robust against closure staleness if used in useEffect, 
-    // but in this component structure, standard handler usage is fine.
-    // The barcode listener calls a wrapper that uses latest state.
-    
     const allergyWarning = getAllergyWarnings(product);
     if (allergyWarning) {
         if (!window.confirm(`⚠️ ALLERGY WARNING\n\nลูกค้ามีประวัติ ${allergyWarning}\n\nต้องการยืนยันการจ่ายยานี้หรือไม่?`)) return;
@@ -170,7 +171,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       if (existing) {
         return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
-      return [...prev, { ...product, quantity: 1 }];
+      return [...prev, { ...product, quantity: 1, instruction: product.defaultInstruction || 'รับประทานตามแพทย์สั่ง' }];
     });
   };
 
@@ -191,6 +192,20 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       }
       return item;
     }));
+  };
+  
+  const openInstructionEditor = (item: CartItem) => {
+      setEditingInstructionId(item.id);
+      setInstructionText(item.instruction || '');
+  };
+
+  const saveInstruction = () => {
+      if (editingInstructionId) {
+          setCart(prev => prev.map(item => 
+              item.id === editingInstructionId ? { ...item, instruction: instructionText } : item
+          ));
+          setEditingInstructionId(null);
+      }
   };
 
   const handleHoldBill = () => {
@@ -312,6 +327,28 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-9rem)] gap-6 animate-fade-in pb-2 relative">
       
+      {/* Instruction Editor Modal */}
+      {editingInstructionId && (
+          <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+               <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-fade-in">
+                   <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                       <Edit3 className="w-5 h-5 text-blue-600"/> Edit Dosage Instruction
+                   </h3>
+                   <p className="text-xs text-slate-500 mb-4">Edit usage instructions for label printing.</p>
+                   <textarea 
+                       className="w-full h-32 p-3 bg-slate-50 border border-slate-200 rounded-xl mb-4 focus:ring-2 focus:ring-blue-500 outline-none"
+                       value={instructionText}
+                       onChange={(e) => setInstructionText(e.target.value)}
+                       placeholder="e.g. รับประทานครั้งละ 1 เม็ด หลังอาหาร เช้า-เย็น"
+                   />
+                   <div className="flex gap-2">
+                       <button onClick={() => setEditingInstructionId(null)} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200">Cancel</button>
+                       <button onClick={saveInstruction} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg">Save Instruction</button>
+                   </div>
+               </div>
+          </div>
+      )}
+
       {/* QR Payment Modal */}
       {showQRModal && (
           <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -417,77 +454,90 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
            </div>
       )}
 
-      {/* Receipt Modal */}
+      {/* Receipt / Label Print Modal */}
       {showReceipt && lastSale && (
         <div className="absolute inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-fade-in">
-                <div className="bg-blue-600 p-6 text-center text-white relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle,white,transparent)]"></div>
-                    <CheckCircle className="w-16 h-16 mx-auto mb-3" />
-                    <h2 className="text-2xl font-bold">Payment Success</h2>
-                    <p className="opacity-90">Thank you for your purchase!</p>
-                </div>
-                <div className="p-6">
-                    <div className="text-center mb-4">
-                        <h3 className="font-bold text-slate-800">{state.settings.storeName}</h3>
-                        <p className="text-xs text-slate-500">{state.settings.address}</p>
-                        <p className="text-xs text-slate-500">Tax ID: {state.settings.taxId} | VAT Included</p>
-                    </div>
-                    <div className="flex justify-between items-center text-sm text-slate-500 mb-4 pb-4 border-b border-dashed border-slate-200">
-                        <span>Receipt No:</span>
-                        <span className="font-mono font-bold text-slate-800">{lastSale.id}</span>
-                    </div>
-                    <div className="space-y-3 mb-6">
-                        {lastSale.items.map((item, idx) => (
-                            <div key={idx} className="flex justify-between text-sm">
-                                <span className="text-slate-600 w-2/3 truncate">
-                                    {item.quantity} x {item.name}
-                                    {item.isVatExempt && <span className="ml-1 text-[9px] bg-slate-100 px-1 rounded text-slate-500">NON-VAT</span>}
-                                </span>
-                                <span className="font-bold text-slate-800">฿{(item.price * item.quantity).toLocaleString()}</span>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="border-t border-slate-100 pt-3 mb-3 space-y-1">
-                        <div className="flex justify-between text-sm">
-                             <span className="text-slate-500">Subtotal</span>
-                             <span className="font-bold text-slate-800">฿{lastSale.total.toLocaleString()}</span>
-                        </div>
-                        {lastSale.discount > 0 && (
-                            <div className="flex justify-between text-sm text-green-600">
-                                <span className="font-bold">Discount (Points)</span>
-                                <span className="font-bold">-฿{lastSale.discount.toLocaleString()}</span>
-                            </div>
-                        )}
-                        <div className="flex justify-between items-center text-lg font-bold text-slate-900 pt-2 border-t border-dashed border-slate-200 mt-2">
-                            <span>Net Total</span>
-                            <span className="text-blue-600">฿{lastSale.netTotal.toLocaleString()}</span>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-slate-50 p-3 rounded-lg mb-4 text-xs space-y-1 border border-slate-100">
-                         <div className="flex justify-between text-slate-500">
-                            <span>Vatable Base</span>
-                            <span>฿{lastSale.subtotalVatable.toFixed(2)}</span>
+            <div className={`bg-white w-full rounded-3xl shadow-2xl overflow-hidden animate-fade-in transition-all duration-300 ${showLabelPrint ? 'max-w-4xl' : 'max-w-sm'}`}>
+                {showLabelPrint ? (
+                    // Label Print View
+                    <div className="flex flex-col h-[80vh]">
+                         <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                             <h3 className="font-bold text-slate-800 flex items-center gap-2"><Sticker className="w-5 h-5"/> Drug Label Preview</h3>
+                             <button onClick={() => setShowLabelPrint(false)} className="text-sm font-bold text-blue-600 hover:text-blue-800">Back to Receipt</button>
                          </div>
-                         <div className="flex justify-between text-slate-500">
-                            <span>VAT (7%)</span>
-                            <span>฿{lastSale.vatAmount.toFixed(2)}</span>
+                         <div className="flex-1 overflow-y-auto p-6 bg-slate-200">
+                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                 {lastSale.items.map((item, idx) => (
+                                     <div key={idx} className="bg-white w-full aspect-[3/2] p-4 rounded shadow-sm border border-slate-300 flex flex-col justify-between text-xs font-mono relative">
+                                         <div className="absolute top-2 right-2 font-bold text-slate-300">LOGO</div>
+                                         <div>
+                                             <div className="font-bold text-base mb-1">{state.settings.storeName}</div>
+                                             <div className="mb-2">Tel: {state.settings.phone}</div>
+                                             <div className="border-b border-black mb-2"></div>
+                                             <div className="font-bold text-lg mb-1">{item.name}</div>
+                                             <div className="text-slate-600 mb-2">{item.genericName} | {item.quantity} {item.unit}</div>
+                                             <div className="font-bold text-sm bg-yellow-50 p-1 border border-yellow-200 rounded">{item.instruction || 'รับประทานตามแพทย์สั่ง'}</div>
+                                         </div>
+                                         <div className="text-[10px] text-right mt-2 text-slate-400">
+                                             Date: {lastSale.date.split(' ')[0]} | Rx: {lastSale.id}
+                                         </div>
+                                     </div>
+                                 ))}
+                             </div>
+                         </div>
+                         <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white">
+                             <button onClick={() => alert("Printing labels to sticker printer...")} className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 flex items-center gap-2">
+                                 <Printer className="w-4 h-4" /> Print All Labels
+                             </button>
                          </div>
                     </div>
+                ) : (
+                    // Standard Receipt View
+                    <>
+                        <div className="bg-blue-600 p-6 text-center text-white relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle,white,transparent)]"></div>
+                            <CheckCircle className="w-16 h-16 mx-auto mb-3" />
+                            <h2 className="text-2xl font-bold">Payment Success</h2>
+                        </div>
+                        <div className="p-6">
+                            <div className="text-center mb-4">
+                                <h3 className="font-bold text-slate-800">{state.settings.storeName}</h3>
+                                <p className="text-xs text-slate-500">Tax ID: {state.settings.taxId}</p>
+                            </div>
+                            <div className="flex justify-between items-center text-sm text-slate-500 mb-4 pb-4 border-b border-dashed border-slate-200">
+                                <span>Receipt No:</span>
+                                <span className="font-mono font-bold text-slate-800">{lastSale.id}</span>
+                            </div>
+                            <div className="space-y-3 mb-6 max-h-40 overflow-y-auto">
+                                {lastSale.items.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between text-sm">
+                                        <span className="text-slate-600 w-2/3 truncate">
+                                            {item.quantity} x {item.name}
+                                        </span>
+                                        <span className="font-bold text-slate-800">฿{(item.price * item.quantity).toLocaleString()}</span>
+                                    </div>
+                                ))}
+                            </div>
 
-                    <div className="text-xs text-center text-slate-400 mt-4 italic">
-                        {state.settings.receiptFooter}
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-3 mt-6">
-                        <button onClick={() => setShowReceipt(false)} className="py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50">Close</button>
-                        <button onClick={() => { alert("Printing to " + state.settings.printerIp); setShowReceipt(false); }} className="py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 flex items-center justify-center gap-2">
-                             <Printer className="w-4 h-4" /> Print
-                        </button>
-                    </div>
-                </div>
+                            <div className="flex justify-between items-center text-lg font-bold text-slate-900 pt-2 border-t border-dashed border-slate-200 mt-2">
+                                <span>Net Total</span>
+                                <span className="text-blue-600">฿{lastSale.netTotal.toLocaleString()}</span>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3 mt-6">
+                                <button onClick={() => setShowReceipt(false)} className="py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50">Close</button>
+                                <button onClick={() => setShowLabelPrint(true)} className="py-3 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 flex items-center justify-center gap-2">
+                                     <Sticker className="w-4 h-4" /> Print Labels
+                                </button>
+                            </div>
+                            <div className="mt-2">
+                                <button onClick={() => alert("Printing receipt...")} className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 flex items-center justify-center gap-2">
+                                     <Printer className="w-4 h-4" /> Print Receipt
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
       )}
@@ -681,27 +731,37 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                         </div>
                     )}
                     {cart.map(item => (
-                        <div key={item.id} className="flex justify-between items-center p-2 hover:bg-slate-50 rounded-xl transition-colors group">
-                            <div className="flex-1 pr-4">
-                                <div className="flex items-center gap-2">
-                                    <h4 className="font-bold text-slate-700 text-sm line-clamp-1">{item.name}</h4>
-                                    {!item.isVatExempt ? (
-                                         <span className="text-[9px] bg-slate-200 text-slate-600 px-1 rounded font-bold" title="VAT Included">V</span>
-                                    ) : (
-                                         <span className="text-[9px] bg-green-100 text-green-700 px-1 rounded font-bold" title="Tax Exempt">E</span>
-                                    )}
+                        <div key={item.id} className="flex flex-col p-2 hover:bg-slate-50 rounded-xl transition-colors group">
+                            <div className="flex justify-between items-center mb-1">
+                                <div className="flex-1 pr-4">
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="font-bold text-slate-700 text-sm line-clamp-1">{item.name}</h4>
+                                        {!item.isVatExempt ? (
+                                            <span className="text-[9px] bg-slate-200 text-slate-600 px-1 rounded font-bold" title="VAT Included">V</span>
+                                        ) : (
+                                            <span className="text-[9px] bg-green-100 text-green-700 px-1 rounded font-bold" title="Tax Exempt">E</span>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-1">฿{item.price} x {item.quantity}</div>
                                 </div>
-                                <div className="text-xs text-slate-500 mt-1">฿{item.price} x {item.quantity}</div>
+                                <div className="flex items-center gap-3">
+                                    <span className="font-bold text-slate-900 w-16 text-right">฿{(item.price * item.quantity).toLocaleString()}</span>
+                                    <div className="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm">
+                                        <button onClick={() => updateQuantity(item.id, -1)} className="p-1 hover:bg-slate-100 rounded-l-lg text-slate-500"><Minus className="w-3 h-3" /></button>
+                                        <button onClick={() => updateQuantity(item.id, 1)} className="p-1 hover:bg-slate-100 rounded-r-lg text-slate-500"><Plus className="w-3 h-3" /></button>
+                                    </div>
+                                    <button onClick={() => removeFromCart(item.id)} className="text-slate-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <span className="font-bold text-slate-900 w-16 text-right">฿{(item.price * item.quantity).toLocaleString()}</span>
-                                <div className="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm">
-                                    <button onClick={() => updateQuantity(item.id, -1)} className="p-1 hover:bg-slate-100 rounded-l-lg text-slate-500"><Minus className="w-3 h-3" /></button>
-                                    <button onClick={() => updateQuantity(item.id, 1)} className="p-1 hover:bg-slate-100 rounded-r-lg text-slate-500"><Plus className="w-3 h-3" /></button>
-                                </div>
-                                <button onClick={() => removeFromCart(item.id)} className="text-slate-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                            {/* Instruction Clickable Area */}
+                            <div 
+                                onClick={() => openInstructionEditor(item)}
+                                className="mt-1 text-[10px] text-slate-400 hover:text-blue-600 cursor-pointer flex items-center gap-1 w-fit bg-slate-50 hover:bg-blue-50 px-2 py-0.5 rounded border border-transparent hover:border-blue-100 transition-all"
+                            >
+                                <Sticker className="w-3 h-3" />
+                                {item.instruction || 'Add usage instruction...'}
                             </div>
                         </div>
                     ))}

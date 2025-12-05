@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { GlobalState } from '../types';
-import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight } from 'lucide-react';
+import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight, TrendingUp, PieChart } from 'lucide-react';
 
 interface InventoryProps {
   data: GlobalState;
@@ -9,7 +9,7 @@ interface InventoryProps {
 }
 
 const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
-  const [activeTab, setActiveTab] = useState<'STOCK' | 'MOVEMENT' | 'EXPIRY'>('STOCK');
+  const [activeTab, setActiveTab] = useState<'STOCK' | 'MOVEMENT' | 'EXPIRY' | 'VALUATION'>('STOCK');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   
   // Adjustment Modal State
@@ -280,6 +280,60 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
         </div>
       );
   };
+  
+  const renderValuation = () => {
+      // Calculate total stock value
+      const totalValue = data.inventory.reduce((acc, curr) => acc + (curr.stock * curr.cost), 0);
+      
+      // ABC Analysis (Simplified)
+      // Sort products by value (consumption value would be better, but let's use stock value for now)
+      const sortedByValue = [...data.inventory].sort((a,b) => (b.stock * b.cost) - (a.stock * a.cost));
+      
+      return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="md:col-span-3 bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-6 text-white shadow-lg flex justify-between items-center">
+                  <div>
+                      <h3 className="text-slate-400 font-medium text-sm">Total Inventory Valuation (Cost Basis)</h3>
+                      <div className="text-4xl font-bold mt-2">฿{totalValue.toLocaleString()}</div>
+                  </div>
+                  <div className="bg-white/10 p-4 rounded-xl">
+                      <TrendingUp className="w-8 h-8 text-green-400" />
+                  </div>
+              </div>
+              
+              <div className="md:col-span-3 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 overflow-hidden">
+                   <div className="p-6 border-b border-slate-100">
+                       <h3 className="font-bold text-slate-800 text-lg">Inventory Valuation Breakdown (Top 10 High Value Items)</h3>
+                       <p className="text-xs text-slate-500 mt-1">Based on Cost Price * Current Stock</p>
+                   </div>
+                   <table className="w-full text-sm text-left">
+                       <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase text-slate-500">
+                           <tr>
+                               <th className="px-6 py-4 font-bold">Product</th>
+                               <th className="px-6 py-4 font-bold text-right">Cost</th>
+                               <th className="px-6 py-4 font-bold text-right">Stock</th>
+                               <th className="px-6 py-4 font-bold text-right">Total Value</th>
+                               <th className="px-6 py-4 font-bold text-center">Class</th>
+                           </tr>
+                       </thead>
+                       <tbody className="divide-y divide-slate-100">
+                           {sortedByValue.slice(0, 10).map((item, idx) => (
+                               <tr key={item.id} className="hover:bg-slate-50">
+                                   <td className="px-6 py-4 font-bold text-slate-700">{item.name}</td>
+                                   <td className="px-6 py-4 text-right text-slate-600">฿{item.cost.toLocaleString()}</td>
+                                   <td className="px-6 py-4 text-right text-slate-600">{item.stock}</td>
+                                   <td className="px-6 py-4 text-right font-bold text-slate-900">฿{(item.stock * item.cost).toLocaleString()}</td>
+                                   <td className="px-6 py-4 text-center">
+                                       <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-bold text-xs border border-blue-100">Class A</span>
+                                   </td>
+                               </tr>
+                           ))}
+                       </tbody>
+                   </table>
+              </div>
+          </div>
+      );
+  };
 
   return (
     <div className="space-y-6 animate-fade-in pb-10 relative">
@@ -357,7 +411,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
             <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Warehouse & Inventory</h2>
             <p className="text-slate-500 text-sm mt-1">Real-time Stock Control with Batch Management</p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex space-x-3 overflow-x-auto">
              <div className="flex bg-white p-1 rounded-full border border-slate-200 shadow-sm">
                 <button 
                     onClick={() => setActiveTab('STOCK')}
@@ -377,6 +431,12 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                 >
                     Expiry Risk
                 </button>
+                <button 
+                    onClick={() => setActiveTab('VALUATION')}
+                    className={`px-5 py-2 rounded-full text-xs font-bold transition-all ${activeTab === 'VALUATION' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                    Valuation
+                </button>
              </div>
         </div>
       </div>
@@ -384,6 +444,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
       {activeTab === 'STOCK' && renderStockTable()}
       {activeTab === 'MOVEMENT' && renderMovementLog()}
       {activeTab === 'EXPIRY' && renderExpiryRisk()}
+      {activeTab === 'VALUATION' && renderValuation()}
     </div>
   );
 };

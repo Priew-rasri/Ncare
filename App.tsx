@@ -10,15 +10,38 @@ import AIAssistant from './components/AIAssistant';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import { MOCK_INVENTORY, MOCK_CUSTOMERS, MOCK_SALES, MOCK_PO, MOCK_EXPENSES, MOCK_BRANCHES, MOCK_SUPPLIERS, MOCK_STOCK_LOGS, MOCK_SETTINGS, MOCK_SHIFTS } from './constants';
-import { GlobalState, Action, StockLog, Shift, Customer } from './types';
+import { GlobalState, Action, StockLog, Shift, Customer, SystemLog } from './types';
 import { Search, Bell, MapPin, ChevronDown, Menu } from 'lucide-react';
 
 const reducer = (state: GlobalState, action: Action): GlobalState => {
   switch (action.type) {
     case 'LOGIN':
-        return { ...state, currentUser: action.payload };
+        return { 
+            ...state, 
+            currentUser: action.payload,
+            systemLogs: [{
+                id: `SYS-${Date.now()}`,
+                timestamp: new Date().toLocaleString(),
+                actor: action.payload.name,
+                action: 'LOGIN',
+                details: 'User logged into the system',
+                severity: 'INFO'
+            }, ...state.systemLogs]
+        };
     case 'LOGOUT':
-        return { ...state, currentUser: null, activeShift: null };
+        return { 
+            ...state, 
+            currentUser: null, 
+            activeShift: null,
+            systemLogs: [{
+                id: `SYS-${Date.now()}`,
+                timestamp: new Date().toLocaleString(),
+                actor: state.currentUser?.name || 'Unknown',
+                action: 'LOGOUT',
+                details: 'User logged out',
+                severity: 'INFO'
+            }, ...state.systemLogs]
+        };
     case 'LOAD_STATE':
         return action.payload;
     case 'ADD_SALE':
@@ -86,6 +109,15 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             staffName: action.payload.staff,
             note: action.payload.reason
         };
+        
+        const sysLog: SystemLog = {
+             id: `SYS-${Date.now()}`,
+             timestamp: new Date().toLocaleString(),
+             actor: action.payload.staff,
+             action: 'STOCK_ADJUST',
+             details: `Adjusted ${adjustProduct.name} by ${action.payload.quantity} (${action.payload.reason})`,
+             severity: 'WARNING'
+        };
 
         return {
             ...state,
@@ -94,7 +126,8 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
                 ? { ...p, stock: p.stock + action.payload.quantity }
                 : p
             ),
-            stockLogs: [adjustmentLog, ...state.stockLogs]
+            stockLogs: [adjustmentLog, ...state.stockLogs],
+            systemLogs: [sysLog, ...state.systemLogs]
         };
 
     case 'UPDATE_CUSTOMER_POINTS':
@@ -186,7 +219,18 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
         };
         
     case 'UPDATE_SETTINGS':
-        return { ...state, settings: action.payload };
+        return { 
+            ...state, 
+            settings: action.payload,
+            systemLogs: [{
+                id: `SYS-${Date.now()}`,
+                timestamp: new Date().toLocaleString(),
+                actor: state.currentUser?.name || 'Admin',
+                action: 'SETTINGS_UPDATE',
+                details: 'Updated global store settings',
+                severity: 'WARNING'
+            }, ...state.systemLogs]
+        };
 
     case 'HOLD_BILL':
         return {
@@ -205,6 +249,16 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
              ...state,
              heldBills: state.heldBills.filter(b => b.id !== action.payload)
         };
+        
+    case 'LOG_SYSTEM_EVENT':
+        return {
+            ...state,
+            systemLogs: [{
+                id: `SYS-${Date.now()}`,
+                timestamp: new Date().toLocaleString(),
+                ...action.payload
+            }, ...state.systemLogs]
+        };
 
     default:
       return state;
@@ -219,6 +273,7 @@ const initialState: GlobalState = {
   purchaseOrders: MOCK_PO,
   suppliers: MOCK_SUPPLIERS,
   stockLogs: MOCK_STOCK_LOGS,
+  systemLogs: [],
   expenses: MOCK_EXPENSES,
   branches: MOCK_BRANCHES,
   currentBranch: MOCK_BRANCHES[0],

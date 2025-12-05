@@ -36,6 +36,15 @@ export interface StockLog {
   batchId?: string;
 }
 
+export interface SystemLog {
+    id: string;
+    timestamp: string;
+    actor: string;
+    action: string;
+    details: string;
+    severity: 'INFO' | 'WARNING' | 'CRITICAL';
+}
+
 export interface Product {
   id: string;
   barcode: string;
@@ -54,6 +63,7 @@ export interface Product {
   requiresPrescription?: boolean;
   drugInteractions?: string[];
   isVatExempt: boolean; 
+  defaultInstruction?: string; // Standard dosage instructions
 }
 
 export interface Customer {
@@ -68,6 +78,7 @@ export interface Customer {
 
 export interface CartItem extends Product {
   quantity: number;
+  instruction?: string; // Custom instruction for this specific sale
 }
 
 export interface HeldBill {
@@ -172,6 +183,7 @@ export interface GlobalState {
   purchaseOrders: PurchaseOrder[];
   suppliers: Supplier[];
   stockLogs: StockLog[];
+  systemLogs: SystemLog[];
   expenses: Expense[];
   currentBranch: Branch;
   branches: Branch[];
@@ -198,4 +210,6 @@ export type Action =
   | { type: 'UPDATE_SETTINGS'; payload: Settings }
   | { type: 'HOLD_BILL'; payload: HeldBill }
   | { type: 'RESUME_BILL'; payload: string } 
-  | { type: 'DELETE_HELD_BILL'; payload: string };
+  | { type: 'DELETE_HELD_BILL'; payload: string }
+  | { type: 'UPDATE_CART_INSTRUCTION'; payload: { productId: string; instruction: string } }
+  | { type: 'LOG_SYSTEM_EVENT'; payload: Omit<SystemLog, 'id' | 'timestamp'> };
