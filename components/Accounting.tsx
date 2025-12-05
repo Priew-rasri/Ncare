@@ -1,8 +1,7 @@
 
-
 import React, { useState } from 'react';
 import { GlobalState, PurchaseOrder } from '../types';
-import { FileText, CheckCircle, Clock, XCircle, TrendingUp, TrendingDown, DollarSign, Calendar, AlertCircle, Printer, Users, Truck, Phone, Box, Plus, X, ShoppingCart, Percent, FileBarChart, Wallet, Download } from 'lucide-react';
+import { FileText, CheckCircle, Clock, XCircle, TrendingUp, TrendingDown, DollarSign, Calendar, AlertCircle, Printer, Users, Truck, Phone, Box, Plus, X, ShoppingCart, Percent, FileBarChart, Wallet, Download, Zap } from 'lucide-react';
 
 interface AccountingProps {
     data: GlobalState;
@@ -13,21 +12,16 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'PO' | 'SUPPLIER' | 'EXPENSE' | 'REPORT' | 'CASH'>('OVERVIEW');
     const [showPOModal, setShowPOModal] = useState(false);
     
-    // New PO Form State
     const [newPOSupplier, setNewPOSupplier] = useState('');
-    
-    // Report Preview State
     const [previewReport, setPreviewReport] = useState<'TAX' | 'SALES' | null>(null);
 
     const totalRevenue = data.sales.reduce((acc, curr) => acc + curr.total, 0);
     const totalExpenses = data.expenses.reduce((acc, curr) => acc + curr.amount, 0);
     
-    // Tax Calculations
     const totalOutputVAT = data.sales.reduce((acc, curr) => acc + (curr.vatAmount || 0), 0);
     const totalVatableSales = data.sales.reduce((acc, curr) => acc + (curr.subtotalVatable || 0), 0);
     const totalExemptSales = data.sales.reduce((acc, curr) => acc + (curr.subtotalExempt || 0), 0);
     
-    // Approximate COGS logic for demo (usually tracked via inventory cost)
     const totalCOGS = totalRevenue * 0.6; 
     const netProfit = totalRevenue - totalCOGS - totalExpenses;
 
@@ -48,6 +42,39 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
         if (window.confirm("ยืนยันการรับสินค้าเข้าคลัง? \nระบบจะสร้าง Lot ใหม่และเพิ่มจำนวนสินค้าใน Inventory ทันที")) {
             dispatch({ type: 'RECEIVE_PO', payload: { poId, receivedDate: new Date().toISOString() } });
         }
+    };
+
+    const handleSmartRestock = () => {
+        // Find items below minStock
+        const lowStockItems = data.inventory.filter(p => p.stock <= p.minStock);
+        if (lowStockItems.length === 0) {
+            alert("No items are currently below minimum stock levels.");
+            return;
+        }
+
+        if(!window.confirm(`Found ${lowStockItems.length} items with low stock. Generate Purchase Order?`)) return;
+
+        // Group by Supplier (Simplified logic: taking first supplier or random for demo)
+        const supplier = data.suppliers[0]; 
+        
+        const newPO: PurchaseOrder = {
+            id: `PO-${Date.now().toString().substr(-6)}`,
+            supplierId: supplier.id,
+            supplierName: supplier.name,
+            date: new Date().toLocaleDateString('en-CA'),
+            dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA'),
+            status: 'PENDING',
+            paymentStatus: 'UNPAID',
+            items: lowStockItems.map(p => ({
+                productId: p.id,
+                productName: p.name,
+                quantity: p.minStock * 2, // Reorder logic: 2x Min Stock
+                unitCost: p.cost
+            })),
+            totalAmount: lowStockItems.reduce((acc, p) => acc + (p.cost * p.minStock * 2), 0)
+        };
+
+        dispatch({ type: 'ADD_PO', payload: newPO });
     };
 
     const handleCreatePO = () => {
@@ -76,7 +103,6 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
 
     const renderOverview = () => (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-fade-in">
-            {/* P&L Card */}
             <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 p-8 lg:col-span-2">
                 <div className="flex justify-between items-start mb-6">
                     <h3 className="font-bold text-slate-800 text-lg flex items-center gap-3">
@@ -118,7 +144,6 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
                         </div>
                     </div>
 
-                    {/* Tax Breakdown Mini-Widget inside P&L */}
                     <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
                         <h4 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
                             <Percent className="w-4 h-4 text-slate-400" /> Revenue Tax Breakdown
@@ -148,7 +173,6 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
             </div>
 
             <div className="space-y-8">
-                 {/* Tax Liability Card */}
                 <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 p-6 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-purple-50 rounded-full -mr-16 -mt-16 z-0"></div>
                     <div className="relative z-10">
@@ -161,7 +185,6 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
                     </div>
                 </div>
 
-                {/* Pending AP Card */}
                 <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 p-6">
                     <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-3">
                         <div className="bg-orange-100 p-2 rounded-lg">
@@ -191,9 +214,14 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
          <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 overflow-hidden animate-fade-in">
              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
                  <h3 className="font-bold text-slate-800 text-lg">Purchase Orders</h3>
-                 <button onClick={() => setShowPOModal(true)} className="bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 px-5 py-2.5 rounded-full transition-colors shadow-lg shadow-blue-200 flex items-center gap-2">
-                    <Plus className="w-4 h-4" /> Create PO
-                 </button>
+                 <div className="flex gap-2">
+                    <button onClick={handleSmartRestock} className="bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 px-4 py-2.5 rounded-full transition-colors flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-orange-500" /> Smart Restock
+                    </button>
+                    <button onClick={() => setShowPOModal(true)} className="bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 px-5 py-2.5 rounded-full transition-colors shadow-lg shadow-blue-200 flex items-center gap-2">
+                        <Plus className="w-4 h-4" /> Create PO
+                    </button>
+                 </div>
              </div>
              <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
@@ -312,7 +340,6 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
     const renderReports = () => (
         <div className="space-y-6 animate-fade-in">
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 {/* Tax Report Card */}
                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all cursor-pointer group" onClick={() => setPreviewReport('TAX')}>
                      <div className="bg-purple-50 w-12 h-12 rounded-xl flex items-center justify-center text-purple-600 mb-4 group-hover:bg-purple-600 group-hover:text-white transition-colors">
                          <FileText className="w-6 h-6" />
@@ -324,7 +351,6 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
                      </div>
                  </div>
 
-                 {/* Sales Report Card */}
                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all cursor-pointer group" onClick={() => setPreviewReport('SALES')}>
                      <div className="bg-blue-50 w-12 h-12 rounded-xl flex items-center justify-center text-blue-600 mb-4 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                          <FileBarChart className="w-6 h-6" />
@@ -337,7 +363,6 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
                  </div>
              </div>
 
-             {/* Report Preview Modal (In-place) */}
              {previewReport && (
                  <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 overflow-hidden animate-fade-in mt-6">
                      <div className="p-4 bg-slate-800 text-white flex justify-between items-center">
@@ -348,7 +373,6 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
                          <button onClick={() => setPreviewReport(null)} className="hover:bg-slate-700 p-1 rounded"><X className="w-5 h-5" /></button>
                      </div>
                      <div className="p-8 font-mono text-sm bg-slate-50">
-                         {/* Header */}
                          <div className="text-center mb-6">
                              <h2 className="font-bold text-xl text-slate-900">{data.settings.storeName}</h2>
                              <p className="text-slate-500">{data.settings.address} (Tax ID: {data.settings.taxId})</p>
@@ -358,7 +382,6 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
                              <p className="text-xs text-slate-500 mt-1">Period: {new Date().toLocaleDateString('en-US', {month: 'long', year: 'numeric'})}</p>
                          </div>
                          
-                         {/* Table Content */}
                          <table className="w-full text-left border-collapse">
                              <thead>
                                  <tr className="border-b-2 border-slate-300">
@@ -450,7 +473,6 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
 
     return (
         <div className="space-y-8 animate-fade-in pb-10 relative">
-            {/* Create PO Modal */}
             {showPOModal && (
                 <div className="absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 fixed top-0 left-72 w-[calc(100vw-18rem)] h-screen">
                     <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl p-8 animate-fade-in border border-slate-100">

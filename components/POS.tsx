@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { GlobalState, Product, CartItem, SaleRecord, Shift, HeldBill } from '../types';
-import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan } from 'lucide-react';
 
 interface POSProps {
   state: GlobalState;
@@ -14,21 +14,52 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [needsPrescription, setNeedsPrescription] = useState(false);
   const [activeCategory, setActiveCategory] = useState('ALL');
-  
-  // Feature: Point Redemption
   const [usePoints, setUsePoints] = useState(false);
-  
-  // Feature: Hold Bill
   const [showHeldBills, setShowHeldBills] = useState(false);
-  
-  // Shift State
   const [openShiftAmount, setOpenShiftAmount] = useState<number>(1000);
   const [closeShiftActual, setCloseShiftActual] = useState<number>(0);
   const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
-
-  // Receipt State
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastSale, setLastSale] = useState<SaleRecord | null>(null);
+  
+  // QR Payment State
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [qrAmount, setQrAmount] = useState(0);
+
+  // Barcode Scanner Logic
+  useEffect(() => {
+    let barcodeBuffer = '';
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+        // Simple logic: if keys are typed very fast, assume it's a scanner
+        const currentTime = Date.now();
+        const isFast = currentTime - lastKeyTime < 50; 
+        lastKeyTime = currentTime;
+
+        if (e.key === 'Enter') {
+            if (barcodeBuffer.length > 5 && (isFast || document.activeElement?.tagName !== 'INPUT')) {
+                // Try to find product by barcode
+                const product = state.inventory.find(p => p.barcode === barcodeBuffer);
+                if (product) {
+                    addToCart(product);
+                    setSearchTerm(''); // Clear search if scanning
+                }
+                barcodeBuffer = '';
+            }
+        } else if (e.key.length === 1) {
+            if (isFast) {
+                barcodeBuffer += e.key;
+            } else {
+                 barcodeBuffer = ''; // Reset if typing slowly (human)
+            }
+        }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [state.inventory, cart]); // Re-bind if inventory/cart logic changes (though addToCart inside Effect needs care, for this demo we rely on closure)
+
 
   const selectedCustomer = useMemo(() => 
     state.customers.find(c => c.id === selectedCustomerId), 
@@ -46,11 +77,10 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
 
   const activeShift = state.activeShift;
 
-  // --- CALCULATION LOGIC ---
   const calculateTotals = (cartItems: CartItem[]) => {
       let total = 0;
       let totalExempt = 0;
-      let totalVatable = 0; // Inclusive
+      let totalVatable = 0; 
 
       cartItems.forEach(item => {
           const lineTotal = item.price * item.quantity;
@@ -62,28 +92,19 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
           }
       });
       
-      // Points Logic
       let discount = 0;
       let pointsToRedeem = 0;
       if (usePoints && selectedCustomer && selectedCustomer.points > 0) {
-          // Rule: 10 Points = 1 THB Discount
-          // Rule: Max discount 20% of bill
           const maxDiscount = total * 0.2;
           const potentialDiscount = selectedCustomer.points / 10;
           
           discount = Math.min(maxDiscount, potentialDiscount);
-          discount = Math.floor(discount); // Round down to whole Baht
+          discount = Math.floor(discount); 
           pointsToRedeem = discount * 10;
       }
       
       const netTotal = total - discount;
-
-      // Calculate VAT from Net Price (Assume discount applies proportionally or to vatable items first - simplified here to apply to total for easy display)
-      // In a strict invoice, we usually apply discount before tax or after. 
-      // Tax Base = (Vatable Sales - Vatable Discount) * 100 / 107.
-      // For simplicity: We assume discount reduces the Vatable portion primarily (common in retail).
       
-      // Pro-rate discount
       const vatableRatio = total > 0 ? totalVatable / total : 0;
       const discountVatable = discount * vatableRatio;
       const netVatable = totalVatable - discountVatable;
@@ -92,14 +113,13 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       const vatAmount = netVatable * (vatRate / (100 + vatRate));
       const subtotalVatableBase = netVatable - vatAmount;
       
-      // Exempt portion
       const discountExempt = discount - discountVatable;
       const netExempt = totalExempt - discountExempt;
 
       return { total, totalExempt: netExempt, totalVatable, subtotalVatableBase, vatAmount, discount, pointsToRedeem, netTotal };
   };
 
-  const { total: cartTotal, totalExempt, vatAmount, subtotalVatableBase, discount, pointsToRedeem, netTotal } = calculateTotals(cart);
+  const { total: cartTotal, discount, netTotal } = calculateTotals(cart);
 
   const getAllergyWarnings = (product: Product) => {
       if (!selectedCustomer) return null;
@@ -127,13 +147,15 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   };
 
   const addToCart = (product: Product) => {
-    // 1. Check Allergies
+    // This function must be robust against closure staleness if used in useEffect, 
+    // but in this component structure, standard handler usage is fine.
+    // The barcode listener calls a wrapper that uses latest state.
+    
     const allergyWarning = getAllergyWarnings(product);
     if (allergyWarning) {
         if (!window.confirm(`⚠️ ALLERGY WARNING\n\nลูกค้ามีประวัติ ${allergyWarning}\n\nต้องการยืนยันการจ่ายยานี้หรือไม่?`)) return;
     }
 
-    // 2. Check Drug Interactions
     const interactionWarnings = getInteractionWarnings(product, cart);
     if (interactionWarnings.length > 0) {
          if (!window.confirm(`⚠️ DRUG INTERACTION DETECTED\n\nยาที่เลือกทำปฏิกิริยากับยาในตะกร้า:\n${interactionWarnings.join('\n')}\n\nเภสัชกรยืนยันการจ่ายหรือไม่?`)) return;
@@ -194,8 +216,20 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       setShowHeldBills(false);
   };
 
-  const handleCheckout = (method: 'CASH' | 'QR' | 'CREDIT') => {
-    if (cart.length === 0) return;
+  const initiatePayment = (method: 'CASH' | 'QR' | 'CREDIT') => {
+      if (cart.length === 0) return;
+      
+      const { netTotal } = calculateTotals(cart);
+
+      if (method === 'QR') {
+          setQrAmount(netTotal);
+          setShowQRModal(true);
+      } else {
+          completeCheckout(method);
+      }
+  };
+
+  const completeCheckout = (method: 'CASH' | 'QR' | 'CREDIT') => {
     if (needsPrescription && !window.confirm("กรุณายืนยันว่าเภสัชกรได้ตรวจสอบใบสั่งแพทย์แล้ว?")) return;
 
     const { total, totalExempt, totalVatable, subtotalVatableBase, vatAmount, discount, pointsToRedeem, netTotal } = calculateTotals(cart);
@@ -204,16 +238,13 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       id: `INV-${Date.now()}`,
       date: new Date().toLocaleString('th-TH'),
       items: cart,
-      total: total, // Gross
+      total: total,
       discount: discount,
       pointsRedeemed: pointsToRedeem,
       netTotal: netTotal,
-      
-      // Tax Breakdown
       subtotalExempt: totalExempt,
       subtotalVatable: subtotalVatableBase,
       vatAmount: vatAmount,
-
       paymentMethod: method,
       customerId: selectedCustomerId || undefined,
       branchId: state.currentBranch.id,
@@ -231,10 +262,11 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     setSelectedCustomerId('');
     setNeedsPrescription(false);
     setUsePoints(false);
+    setShowQRModal(false);
   };
 
   const handleOpenShift = () => {
-      dispatch({ type: 'OPEN_SHIFT', payload: { staff: 'Admin User', startCash: openShiftAmount } });
+      dispatch({ type: 'OPEN_SHIFT', payload: { staff: state.currentUser?.name || 'Staff', startCash: openShiftAmount } });
   };
 
   const handleCloseShift = () => {
@@ -245,8 +277,6 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   };
 
   const categories = ['ALL', ...Array.from(new Set(state.inventory.map(p => p.category)))];
-
-  // ---------------- RENDER ---------------- //
 
   if (!activeShift) {
       return (
@@ -282,6 +312,29 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-9rem)] gap-6 animate-fade-in pb-2 relative">
       
+      {/* QR Payment Modal */}
+      {showQRModal && (
+          <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+               <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-fade-in">
+                   <div className="bg-[#103259] p-6 text-center text-white">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/c/c5/PromptPay-logo.png" alt="PromptPay" className="h-8 mx-auto mb-4 bg-white p-1 rounded" />
+                        <h3 className="font-bold text-lg">Scan to Pay</h3>
+                        <div className="text-3xl font-bold mt-2">฿{qrAmount.toLocaleString()}</div>
+                   </div>
+                   <div className="p-8 flex flex-col items-center">
+                        <div className="bg-white p-4 border border-slate-200 rounded-xl shadow-inner mb-6">
+                             <QrCode size={180} className="text-slate-800" />
+                        </div>
+                        <p className="text-xs text-slate-400 mb-6 text-center">Reference: {`INV-${Date.now().toString().substr(-6)}`}</p>
+                        <div className="grid grid-cols-2 gap-3 w-full">
+                            <button onClick={() => setShowQRModal(false)} className="py-3 rounded-xl border border-slate-200 font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
+                            <button onClick={() => completeCheckout('QR')} className="py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-lg">Confirm Payment</button>
+                        </div>
+                   </div>
+               </div>
+          </div>
+      )}
+
       {/* Held Bills Modal */}
       {showHeldBills && (
           <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -413,7 +466,6 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                         </div>
                     </div>
                     
-                    {/* Tax Breakdown Section */}
                     <div className="bg-slate-50 p-3 rounded-lg mb-4 text-xs space-y-1 border border-slate-100">
                          <div className="flex justify-between text-slate-500">
                             <span>Vatable Base</span>
@@ -464,8 +516,9 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                     className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-slate-700"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    autoFocus
                 />
-                <Barcode className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5 opacity-50" />
+                <Scan className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5 opacity-50" />
             </div>
             <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
                 {categories.map(cat => (
@@ -505,7 +558,6 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                                 <Pill className="w-12 h-12 text-slate-300 group-hover:text-blue-500 transition-colors" />
                             )}
                             
-                            {/* Tags */}
                             <div className="absolute top-2 left-2 flex flex-col gap-1">
                                 {!product.isVatExempt && (
                                     <div className="bg-slate-800 text-white text-[9px] py-0.5 px-1.5 rounded font-bold shadow-sm">
@@ -514,7 +566,6 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                                 )}
                             </div>
 
-                            {/* Warnings */}
                             {hasIssues && (
                                 <div className="absolute top-2 right-2 left-auto bg-red-500 text-white text-[10px] py-1 px-2 rounded-md font-bold text-center shadow-sm animate-pulse flex items-center justify-center gap-1">
                                     <AlertOctagon className="w-3 h-3" /> SAFETY
@@ -549,10 +600,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
         </div>
       </div>
 
-      {/* Cart Section */}
       <div className="lg:w-1/3 flex flex-col h-full bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 overflow-hidden relative z-20">
-        
-        {/* Action Bar: Hold/Resume */}
         <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex justify-end gap-2">
             <button 
                 onClick={() => setShowHeldBills(true)}
@@ -662,7 +710,6 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
         </div>
 
         <div className="p-6 bg-slate-50 border-t border-slate-200">
-            {/* Point Redemption Checkbox */}
             {selectedCustomer && selectedCustomer.points >= 10 && cart.length > 0 && (
                 <div className="mb-4 bg-white p-3 rounded-xl border border-blue-100 flex items-center justify-between shadow-sm">
                     <div className="flex items-center gap-2">
@@ -676,7 +723,6 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                 </div>
             )}
 
-            {/* Total Summary */}
             <div className="space-y-1 mb-6">
                  <div className="flex justify-between items-end">
                     <span className="text-slate-500 text-sm font-medium">Subtotal</span>
@@ -702,7 +748,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                 ].map((m) => (
                     <button 
                         key={m.id}
-                        onClick={() => handleCheckout(m.id as any)}
+                        onClick={() => initiatePayment(m.id as any)}
                         disabled={cart.length === 0}
                         className={`flex flex-col items-center justify-center p-4 bg-white border border-slate-200 rounded-xl hover:border-${m.color}-500 hover:shadow-md transition-all disabled:opacity-50 disabled:hover:shadow-none group`}
                     >

@@ -1,6 +1,11 @@
 
+import { Product, ProductCategory, Customer, PurchaseOrder, SaleRecord, Expense, Branch, Supplier, StockLog, Settings, Shift, User } from './types';
 
-import { Product, ProductCategory, Customer, PurchaseOrder, SaleRecord, Expense, Branch, Supplier, StockLog, Settings, Shift } from './types';
+export const MOCK_USERS: User[] = [
+    { id: 'U001', username: 'owner', name: 'Dr. Somchai (Owner)', role: 'OWNER' },
+    { id: 'U002', username: 'pharm', name: 'P. Jane (Pharmacist)', role: 'PHARMACIST' },
+    { id: 'U003', username: 'staff', name: 'Staff Boy', role: 'STAFF' },
+];
 
 export const MOCK_BRANCHES: Branch[] = [
     { id: 'B001', name: 'สาขาใหญ่ (Headquarters)', location: 'Siam Square', type: 'HQ' },
@@ -180,7 +185,6 @@ export const MOCK_PO: PurchaseOrder[] = [
   },
 ];
 
-// Generate past 7 days of sales for realistic dashboard
 const generateMockSales = (): SaleRecord[] => {
     const sales: SaleRecord[] = [];
     const today = new Date();
@@ -191,7 +195,6 @@ const generateMockSales = (): SaleRecord[] => {
         date.setDate(today.getDate() - i);
         const dateStr = date.toLocaleString('th-TH');
         
-        // 3-5 sales per day
         const dailyCount = 3 + Math.floor(Math.random() * 3);
         
         for (let j = 0; j < dailyCount; j++) {
@@ -214,7 +217,7 @@ const generateMockSales = (): SaleRecord[] => {
                 items: [
                    { ...MOCK_INVENTORY[0], quantity: 2 },
                    { ...MOCK_INVENTORY[2], quantity: 1 }
-                ], // simplified items
+                ],
                 branchId: 'B001'
             });
         }
@@ -237,5 +240,5 @@ export const MOCK_EXPENSES: Expense[] = [
 
 export const MOCK_SHIFTS: Shift[] = [
     { id: 'S-1001', staffName: 'Staff A', startTime: '2024-05-24 08:00', endTime: '2024-05-24 16:00', startCash: 1000, expectedCash: 5400, actualCash: 5400, totalSales: 4400, status: 'CLOSED' },
-    { id: 'S-1002', staffName: 'Staff B', startTime: '2024-05-23 08:00', endTime: '2024-05-23 16:00', startCash: 1000, expectedCash: 3500, actualCash: 3450, totalSales: 2500, status: 'CLOSED' }, // Shortage 50
+    { id: 'S-1002', staffName: 'Staff B', startTime: '2024-05-23 08:00', endTime: '2024-05-23 16:00', startCash: 1000, expectedCash: 3500, actualCash: 3450, totalSales: 2500, status: 'CLOSED' }, 
 ];

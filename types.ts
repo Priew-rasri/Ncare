@@ -7,6 +7,16 @@ export enum ProductCategory {
   HOUSEHOLD = 'ยาสามัญประจำบ้าน'
 }
 
+export type UserRole = 'OWNER' | 'PHARMACIST' | 'STAFF';
+
+export interface User {
+    id: string;
+    username: string;
+    name: string;
+    role: UserRole;
+    avatar?: string;
+}
+
 export interface Batch {
   lotNumber: string;
   expiryDate: string;
@@ -43,7 +53,7 @@ export interface Product {
   image?: string;
   requiresPrescription?: boolean;
   drugInteractions?: string[];
-  isVatExempt: boolean; // New: For tax management
+  isVatExempt: boolean; 
 }
 
 export interface Customer {
@@ -73,12 +83,11 @@ export interface SaleRecord {
   date: string;
   customerId?: string;
   items: CartItem[];
-  total: number;       // Gross Total
-  discount: number;    // Discount Amount
+  total: number;       
+  discount: number;    
   pointsRedeemed: number;
-  netTotal: number;    // Final Payment Amount
+  netTotal: number;    
   
-  // Tax Breakdown for Accounting (Calculated from NetTotal)
   subtotalVatable: number; 
   subtotalExempt: number;  
   vatAmount: number;       
@@ -156,6 +165,7 @@ export interface Settings {
 }
 
 export interface GlobalState {
+  currentUser: User | null; // Auth
   inventory: Product[];
   customers: Customer[];
   sales: SaleRecord[];
@@ -172,6 +182,9 @@ export interface GlobalState {
 }
 
 export type Action =
+  | { type: 'LOGIN'; payload: User }
+  | { type: 'LOGOUT' }
+  | { type: 'LOAD_STATE'; payload: GlobalState } // For persistence
   | { type: 'ADD_SALE'; payload: SaleRecord }
   | { type: 'UPDATE_STOCK'; payload: { productId: string; quantity: number; note: string } }
   | { type: 'ADD_CUSTOMER'; payload: Customer }
@@ -184,5 +197,5 @@ export type Action =
   | { type: 'CLOSE_SHIFT'; payload: { actualCash: number } }
   | { type: 'UPDATE_SETTINGS'; payload: Settings }
   | { type: 'HOLD_BILL'; payload: HeldBill }
-  | { type: 'RESUME_BILL'; payload: string } // billId
+  | { type: 'RESUME_BILL'; payload: string } 
   | { type: 'DELETE_HELD_BILL'; payload: string };
