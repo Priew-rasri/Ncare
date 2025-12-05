@@ -372,7 +372,7 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
                          </div>
                          <button onClick={() => setPreviewReport(null)} className="hover:bg-slate-700 p-1 rounded"><X className="w-5 h-5" /></button>
                      </div>
-                     <div className="p-8 font-mono text-sm bg-slate-50">
+                     <div className="p-8 font-mono text-sm bg-slate-50 max-h-[600px] overflow-y-auto">
                          <div className="text-center mb-6">
                              <h2 className="font-bold text-xl text-slate-900">{data.settings.storeName}</h2>
                              <p className="text-slate-500">{data.settings.address} (Tax ID: {data.settings.taxId})</p>
@@ -393,8 +393,9 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
                                  </tr>
                              </thead>
                              <tbody>
-                                 {data.sales.slice(0, 10).map((sale) => (
-                                     <tr key={sale.id} className="border-b border-slate-200 text-slate-600">
+                                 {/* REAL DATA INTEGRATION: Slicing only for performance if list is huge, but here we map state.sales */}
+                                 {data.sales.map((sale) => (
+                                     <tr key={sale.id} className="border-b border-slate-200 text-slate-600 hover:bg-white">
                                          <td className="py-2">{sale.date.split(' ')[0]}</td>
                                          <td className="py-2">{sale.id}</td>
                                          <td className="py-2 text-right">{sale.subtotalVatable.toFixed(2)}</td>
@@ -404,17 +405,17 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
                                  ))}
                              </tbody>
                              <tfoot>
-                                 <tr className="border-t-2 border-slate-300 font-bold text-slate-900">
-                                     <td colSpan={2} className="py-3 text-right">Total:</td>
-                                     <td className="py-3 text-right">{data.sales.slice(0,10).reduce((a,c)=>a+c.subtotalVatable,0).toFixed(2)}</td>
-                                     <td className="py-3 text-right">{data.sales.slice(0,10).reduce((a,c)=>a+c.vatAmount,0).toFixed(2)}</td>
-                                     <td className="py-3 text-right">{data.sales.slice(0,10).reduce((a,c)=>a+(c.subtotalVatable+c.vatAmount),0).toFixed(2)}</td>
+                                 <tr className="border-t-2 border-slate-300 font-bold text-slate-900 bg-slate-100">
+                                     <td colSpan={2} className="py-3 text-right">Grand Total:</td>
+                                     <td className="py-3 text-right">{data.sales.reduce((a,c)=>a+c.subtotalVatable,0).toFixed(2)}</td>
+                                     <td className="py-3 text-right">{data.sales.reduce((a,c)=>a+c.vatAmount,0).toFixed(2)}</td>
+                                     <td className="py-3 text-right">{data.sales.reduce((a,c)=>a+(c.subtotalVatable+c.vatAmount),0).toFixed(2)}</td>
                                  </tr>
                              </tfoot>
                          </table>
                          
                          <div className="mt-8 text-center">
-                             <button className="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 mx-auto hover:bg-slate-800 transition-colors">
+                             <button onClick={() => window.print()} className="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 mx-auto hover:bg-slate-800 transition-colors">
                                  <Printer className="w-4 h-4" /> Print Document
                              </button>
                          </div>

@@ -57,6 +57,36 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
     case 'LOAD_STATE':
         return action.payload;
     case 'ADD_SALE':
+        // 1. FEFO Logic for Inventory Update
+        const updatedInventoryFEFO = state.inventory.map(product => {
+            const saleItem = action.payload.items.find(i => i.id === product.id);
+            if (!saleItem) return product;
+
+            let remainingQtyToDeduct = saleItem.quantity;
+            // Sort batches by expiry date (Ascending)
+            const sortedBatches = [...product.batches].sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
+            
+            const updatedBatches = sortedBatches.map(batch => {
+                if (remainingQtyToDeduct <= 0) return batch;
+                
+                if (batch.quantity >= remainingQtyToDeduct) {
+                    const newBatch = { ...batch, quantity: batch.quantity - remainingQtyToDeduct };
+                    remainingQtyToDeduct = 0;
+                    return newBatch;
+                } else {
+                    remainingQtyToDeduct -= batch.quantity;
+                    return { ...batch, quantity: 0 }; // Mark as empty
+                }
+            }).filter(b => b.quantity > 0); // Cleanup empty batches
+
+            return {
+                ...product,
+                stock: product.stock - saleItem.quantity,
+                batches: updatedBatches
+            };
+        });
+
+        // 2. Stock Logs
         const newLogs: StockLog[] = action.payload.items.map(item => ({
             id: `LOG-${Date.now()}-${Math.random()}`,
             date: new Date().toLocaleString(),
@@ -64,9 +94,11 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             productName: item.name,
             action: 'SALE',
             quantity: -item.quantity,
-            staffName: state.currentUser?.name || 'Unknown'
+            staffName: state.currentUser?.name || 'Unknown',
+            note: 'POS Sale'
         }));
 
+        // 3. Update Shift
         let updatedShift = state.activeShift;
         if (updatedShift && action.payload.paymentMethod === 'CASH') {
              updatedShift = {
@@ -75,6 +107,7 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
              };
         }
 
+        // 4. Update Customer Points
         let updatedCustomers = state.customers;
         if (action.payload.customerId) {
             updatedCustomers = state.customers.map(c => {
@@ -94,10 +127,13 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
       return {
         ...state,
         sales: [action.payload, ...state.sales],
+        inventory: updatedInventoryFEFO, // Use the FEFO updated inventory
         stockLogs: [...newLogs, ...state.stockLogs],
         activeShift: updatedShift,
         customers: updatedCustomers
       };
+    
+    // Legacy update stock (kept for other manual adjustments if needed)
     case 'UPDATE_STOCK':
       return {
         ...state,
@@ -107,6 +143,7 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             : p
         )
       };
+
     case 'ADJUST_STOCK':
         const adjustProduct = state.inventory.find(p => p.id === action.payload.productId);
         if (!adjustProduct) return state;
@@ -287,7 +324,7 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
         };
     
     case 'UPDATE_CART_INSTRUCTION':
-        return state; // Logic handled in POS component locally currently, can be moved here if global cart state is needed
+        return state; 
 
     default:
       return state;
@@ -417,7 +454,7 @@ const App: React.FC = () => {
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
       <main className="flex-1 ml-72 flex flex-col h-screen overflow-hidden">
-        <header className="bg-white px-8 py-4 flex justify-between items-center border-b border-slate-100 sticky top-0 z-20 shadow-sm">
+        <header className="bg-white px-8 py-4 flex justify-between items-center border-b border-slate-100 sticky top-0 z-20 shadow-sm no-print">
             <div className="flex flex-col">
                 <h1 className="text-xl font-bold text-slate-800 capitalize tracking-tight flex items-center gap-2">
                     {activeTab === 'ai-assistant' ? 'AI Strategic Assistant' : activeTab}

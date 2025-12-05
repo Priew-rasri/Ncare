@@ -289,10 +289,8 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     };
 
     dispatch({ type: 'ADD_SALE', payload: sale });
-    cart.forEach(item => {
-      dispatch({ type: 'UPDATE_STOCK', payload: { productId: item.id, quantity: -item.quantity } });
-    });
-
+    // Note: Inventory deduction is now handled in ADD_SALE reducer for FEFO accuracy
+    
     setLastSale(sale);
     setShowReceipt(true);
     setCart([]);
@@ -504,12 +502,12 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
 
       {/* Receipt / Label Print Modal */}
       {showReceipt && lastSale && (
-        <div className="absolute inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className={`bg-white w-full rounded-3xl shadow-2xl overflow-hidden animate-fade-in transition-all duration-300 ${showLabelPrint ? 'max-w-4xl' : 'max-w-sm'}`}>
+        <div id="receipt-modal" className="absolute inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+            <div id="printable-receipt" className={`bg-white w-full rounded-3xl shadow-2xl overflow-hidden animate-fade-in transition-all duration-300 ${showLabelPrint ? 'max-w-4xl' : 'max-w-sm'}`}>
                 {showLabelPrint ? (
                     // Label Print View
                     <div className="flex flex-col h-[80vh]">
-                         <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                         <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center no-print">
                              <h3 className="font-bold text-slate-800 flex items-center gap-2"><Sticker className="w-5 h-5"/> Drug Label Preview</h3>
                              <button onClick={() => setShowLabelPrint(false)} className="text-sm font-bold text-blue-600 hover:text-blue-800">Back to Receipt</button>
                          </div>
@@ -533,8 +531,8 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                                  ))}
                              </div>
                          </div>
-                         <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white">
-                             <button onClick={() => alert("Printing labels to sticker printer...")} className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 flex items-center gap-2">
+                         <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white no-print">
+                             <button onClick={() => window.print()} className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 flex items-center gap-2">
                                  <Printer className="w-4 h-4" /> Print All Labels
                              </button>
                          </div>
@@ -542,21 +540,22 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                 ) : (
                     // Standard Receipt View
                     <>
-                        <div className="bg-blue-600 p-6 text-center text-white relative overflow-hidden">
+                        <div className="bg-blue-600 p-6 text-center text-white relative overflow-hidden no-print">
                             <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle,white,transparent)]"></div>
                             <CheckCircle className="w-16 h-16 mx-auto mb-3" />
                             <h2 className="text-2xl font-bold">Payment Success</h2>
                         </div>
                         <div className="p-6">
                             <div className="text-center mb-4">
-                                <h3 className="font-bold text-slate-800">{state.settings.storeName}</h3>
-                                <p className="text-xs text-slate-500">Tax ID: {state.settings.taxId}</p>
+                                <h3 className="font-bold text-slate-800 text-xl">{state.settings.storeName}</h3>
+                                <p className="text-xs text-slate-500 mb-1">{state.settings.address}</p>
+                                <p className="text-xs text-slate-500">Tax ID: {state.settings.taxId} | Tel: {state.settings.phone}</p>
                             </div>
                             <div className="flex justify-between items-center text-sm text-slate-500 mb-4 pb-4 border-b border-dashed border-slate-200">
-                                <span>Receipt No:</span>
-                                <span className="font-mono font-bold text-slate-800">{lastSale.id}</span>
+                                <span>No: <span className="font-mono font-bold text-slate-800">{lastSale.id}</span></span>
+                                <span>{lastSale.date}</span>
                             </div>
-                            <div className="space-y-3 mb-6 max-h-40 overflow-y-auto">
+                            <div className="space-y-3 mb-6 max-h-none overflow-visible">
                                 {lastSale.items.map((item, idx) => (
                                     <div key={idx} className="flex justify-between text-sm">
                                         <span className="text-slate-600 w-2/3 truncate">
@@ -567,19 +566,41 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                                 ))}
                             </div>
 
-                            <div className="flex justify-between items-center text-lg font-bold text-slate-900 pt-2 border-t border-dashed border-slate-200 mt-2">
+                            <div className="border-t border-dashed border-slate-200 pt-2 space-y-1">
+                                <div className="flex justify-between text-xs text-slate-500">
+                                    <span>Subtotal</span>
+                                    <span>฿{lastSale.total.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-slate-500">
+                                    <span>VAT 7%</span>
+                                    <span>฿{lastSale.vatAmount.toLocaleString(undefined, {maximumFractionDigits:2})}</span>
+                                </div>
+                                {lastSale.discount > 0 && (
+                                     <div className="flex justify-between text-xs text-green-600 font-bold">
+                                        <span>Discount</span>
+                                        <span>-฿{lastSale.discount.toLocaleString()}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex justify-between items-center text-xl font-bold text-slate-900 pt-4 mt-2 border-t border-slate-900">
                                 <span>Net Total</span>
-                                <span className="text-blue-600">฿{lastSale.netTotal.toLocaleString()}</span>
+                                <span>฿{lastSale.netTotal.toLocaleString()}</span>
+                            </div>
+
+                            <div className="mt-8 text-center text-[10px] text-slate-400">
+                                <p>Thank you for shopping with Ncare.</p>
+                                <p>{state.settings.receiptFooter}</p>
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-3 mt-6">
+                            <div className="grid grid-cols-2 gap-3 mt-6 no-print">
                                 <button onClick={() => setShowReceipt(false)} className="py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50">Close</button>
                                 <button onClick={() => setShowLabelPrint(true)} className="py-3 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 flex items-center justify-center gap-2">
                                      <Sticker className="w-4 h-4" /> Print Labels
                                 </button>
                             </div>
-                            <div className="mt-2">
-                                <button onClick={() => alert("Printing receipt...")} className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 flex items-center justify-center gap-2">
+                            <div className="mt-2 no-print">
+                                <button onClick={() => window.print()} className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 flex items-center justify-center gap-2">
                                      <Printer className="w-4 h-4" /> Print Receipt
                                 </button>
                             </div>
@@ -591,7 +612,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       )}
 
       {/* Catalog Area */}
-      <div className="lg:w-2/3 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 flex flex-col overflow-hidden">
+      <div className="lg:w-2/3 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 flex flex-col overflow-hidden no-print">
         {/* Search & Filter Header */}
         <div className="p-5 border-b border-slate-100 bg-white sticky top-0 z-10 space-y-4">
             <div className="flex justify-between items-center">
@@ -698,7 +719,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
         </div>
       </div>
 
-      <div className="lg:w-1/3 flex flex-col h-full bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 overflow-hidden relative z-20">
+      <div className="lg:w-1/3 flex flex-col h-full bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 overflow-hidden relative z-20 no-print">
         <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex justify-end gap-2">
             <button 
                 onClick={() => setShowHeldBills(true)}
