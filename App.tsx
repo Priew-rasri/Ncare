@@ -80,6 +80,24 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
         };
     case 'LOAD_STATE':
         return action.payload;
+        
+    case 'IMPORT_DATA':
+        // Restore everything but keep the current user session if needed, or logout.
+        // For security, let's keep the user logged in but warn them in the UI.
+        // We override everything with payload
+        return {
+            ...action.payload,
+            currentUser: state.currentUser, // Maintain session
+            systemLogs: [{
+                id: `SYS-${Date.now()}`,
+                timestamp: new Date().toLocaleString(),
+                actor: state.currentUser?.name || 'Admin',
+                action: 'DB_RESTORE',
+                details: 'Database restored from backup file',
+                severity: 'CRITICAL'
+            }, ...(action.payload.systemLogs || [])]
+        };
+        
     case 'ADD_SALE':
         // Generate proper Running Number & Queue
         const newSaleId = generateDocId('INV', state.sales);
@@ -497,7 +515,12 @@ const App: React.FC = () => {
       if (savedState) {
           try {
               const parsed = JSON.parse(savedState);
-              const mergedState = { ...parsed, transfers: parsed.transfers || MOCK_TRANSFERS };
+              // Ensure critical arrays exist even if backup is old
+              const mergedState = { 
+                  ...parsed, 
+                  transfers: parsed.transfers || MOCK_TRANSFERS,
+                  sales: parsed.sales || MOCK_SALES 
+              };
               dispatch({ type: 'LOAD_STATE', payload: { ...mergedState, currentUser: null, activeShift: parsed.activeShift } }); 
           } catch (e) {
               console.error("Failed to load persistence");

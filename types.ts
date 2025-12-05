@@ -272,6 +272,7 @@ export type Action =
   | { type: 'LOGIN'; payload: User }
   | { type: 'LOGOUT' }
   | { type: 'LOAD_STATE'; payload: GlobalState } // For persistence
+  | { type: 'IMPORT_DATA'; payload: GlobalState } // For backup/restore
   | { type: 'ADD_SALE'; payload: SaleRecord }
   | { type: 'VOID_SALE'; payload: { saleId: string; reason: string; user: string } }
   | { type: 'UPDATE_STOCK'; payload: { productId: string; quantity: number; note: string } }

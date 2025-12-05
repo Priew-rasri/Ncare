@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GlobalState, Settings as SettingsType } from '../types';
-import { Save, Store, Receipt, Printer, Info, CheckCircle, Shield, FileText } from 'lucide-react';
+import { Save, Store, Receipt, Printer, Info, CheckCircle, Shield, FileText, Database, Download, Upload, AlertTriangle } from 'lucide-react';
 
 interface SettingsProps {
     data: GlobalState;
@@ -11,7 +11,8 @@ interface SettingsProps {
 const Settings: React.FC<SettingsProps> = ({ data, dispatch }) => {
     const [form, setForm] = useState<SettingsType>(data.settings);
     const [saved, setSaved] = useState(false);
-    const [activeTab, setActiveTab] = useState<'GENERAL' | 'AUDIT'>('GENERAL');
+    const [activeTab, setActiveTab] = useState<'GENERAL' | 'AUDIT' | 'DATABASE'>('GENERAL');
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         setForm(data.settings);
@@ -25,6 +26,42 @@ const Settings: React.FC<SettingsProps> = ({ data, dispatch }) => {
 
     const handleChange = (field: keyof SettingsType, value: any) => {
         setForm(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleBackup = () => {
+        const dataStr = JSON.stringify(data, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `ncare_backup_${new Date().toISOString().split('T')[0]}.json`;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleRestoreClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const json = JSON.parse(event.target?.result as string);
+                if (window.confirm("WARNING: This will overwrite all current data with the backup file. Are you sure?")) {
+                    dispatch({ type: 'IMPORT_DATA', payload: json });
+                    alert("Database restored successfully!");
+                }
+            } catch (err) {
+                alert("Error parsing backup file. Please ensure it is a valid Ncare JSON backup.");
+            }
+        };
+        reader.readAsText(file);
+        // Reset input
+        e.target.value = ''; 
     };
 
     const renderGeneral = () => (
@@ -176,6 +213,54 @@ const Settings: React.FC<SettingsProps> = ({ data, dispatch }) => {
         </div>
     );
 
+    const renderDatabase = () => (
+        <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 p-8 animate-fade-in">
+             <div className="flex items-center gap-3 mb-6 border-b border-slate-50 pb-4">
+                 <div className="bg-teal-50 p-2.5 rounded-lg text-teal-600">
+                     <Database className="w-5 h-5" />
+                 </div>
+                 <div>
+                     <h3 className="text-lg font-bold text-slate-800">Database Management</h3>
+                     <p className="text-xs text-slate-500">Backup and Restore your entire store data.</p>
+                 </div>
+             </div>
+             
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 flex flex-col items-center text-center hover:shadow-md transition-all">
+                     <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4">
+                         <Download className="w-8 h-8" />
+                     </div>
+                     <h4 className="font-bold text-slate-800 mb-2">Backup Database</h4>
+                     <p className="text-xs text-slate-500 mb-6">Download a JSON file containing all sales, inventory, customers, and settings.</p>
+                     <button onClick={handleBackup} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200">
+                         Download Backup (.json)
+                     </button>
+                 </div>
+
+                 <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 flex flex-col items-center text-center hover:shadow-md transition-all relative overflow-hidden">
+                     <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mb-4">
+                         <Upload className="w-8 h-8" />
+                     </div>
+                     <h4 className="font-bold text-slate-800 mb-2">Restore Database</h4>
+                     <p className="text-xs text-slate-500 mb-6">Upload a previously backed up JSON file to restore your system state.</p>
+                     <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleFileChange} 
+                        accept=".json" 
+                        className="hidden" 
+                     />
+                     <button onClick={handleRestoreClick} className="w-full py-3 bg-white border-2 border-slate-300 text-slate-600 font-bold rounded-xl hover:bg-slate-100 transition-colors">
+                         Select File to Restore
+                     </button>
+                     <div className="mt-4 flex items-center gap-2 text-[10px] text-red-500 font-bold bg-red-50 px-3 py-1 rounded-full">
+                         <AlertTriangle className="w-3 h-3" /> Warning: Overwrites current data
+                     </div>
+                 </div>
+             </div>
+        </div>
+    );
+
     return (
         <div className="max-w-4xl mx-auto animate-fade-in pb-10">
             <div className="flex justify-between items-center mb-6">
@@ -189,6 +274,12 @@ const Settings: React.FC<SettingsProps> = ({ data, dispatch }) => {
                         className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'GENERAL' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
                     >
                         General Settings
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('DATABASE')}
+                        className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'DATABASE' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
+                    >
+                        Database
                     </button>
                     <button 
                         onClick={() => setActiveTab('AUDIT')}
@@ -206,7 +297,9 @@ const Settings: React.FC<SettingsProps> = ({ data, dispatch }) => {
                 </div>
             </div>
 
-            {activeTab === 'GENERAL' ? renderGeneral() : renderAudit()}
+            {activeTab === 'GENERAL' && renderGeneral()}
+            {activeTab === 'AUDIT' && renderAudit()}
+            {activeTab === 'DATABASE' && renderDatabase()}
         </div>
     );
 };
