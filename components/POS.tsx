@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { GlobalState, Product, CartItem, SaleRecord, Shift, HeldBill } from '../types';
-import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan, Edit3, Sticker, UploadCloud, FileCheck, Camera, History, AlertTriangle, FileText, Briefcase, Coins, ArrowRightLeft, MousePointerClick } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan, Edit3, Sticker, UploadCloud, FileCheck, Camera, History, AlertTriangle, FileText, Briefcase, Coins, ArrowRightLeft, MousePointerClick, Tag } from 'lucide-react';
 
 interface POSProps {
   state: GlobalState;
@@ -30,6 +30,10 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [showCashOpsModal, setShowCashOpsModal] = useState(false);
   const [showHeldBillsModal, setShowHeldBillsModal] = useState(false);
 
+  // Instruction Editor
+  const [editingInstructionId, setEditingInstructionId] = useState<string | null>(null);
+  const [tempInstruction, setTempInstruction] = useState('');
+
   // Cash Ops State
   const [cashOpsType, setCashOpsType] = useState<'PAY_OUT' | 'CASH_DROP'>('PAY_OUT');
   const [cashOpsAmount, setCashOpsAmount] = useState<string>('');
@@ -40,7 +44,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [tenderedAmount, setTenderedAmount] = useState('');
   const [showTaxInvoiceForm, setShowTaxInvoiceForm] = useState(false);
   const [taxDetails, setTaxDetails] = useState({ name: '', taxId: '', address: '' });
-  const [printMode, setPrintMode] = useState<'SLIP' | 'A4'>('SLIP');
+  const [printMode, setPrintMode] = useState<'SLIP' | 'A4' | 'STICKER'>('SLIP');
 
   // Void Reason
   const [voidReason, setVoidReason] = useState('');
@@ -271,6 +275,16 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       setCashOpsReason('');
   };
 
+  const openInstructionEditor = (item: CartItem) => {
+      setEditingInstructionId(item.id);
+      setTempInstruction(item.instruction || item.defaultInstruction || '');
+  };
+
+  const saveInstruction = () => {
+      setCart(prev => prev.map(item => item.id === editingInstructionId ? { ...item, instruction: tempInstruction } : item));
+      setEditingInstructionId(null);
+  };
+
   const initiatePayment = (method: 'CASH' | 'QR' | 'CREDIT') => {
       if (cart.length === 0) return;
       
@@ -341,14 +355,17 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       }
   }, [showReceipt, state.sales]);
 
-  const handlePrint = () => {
-      if (printMode === 'A4') {
+  const handlePrint = (mode: 'SLIP' | 'A4' | 'STICKER') => {
+      document.body.className = ''; // Reset classes
+      if (mode === 'A4') {
           document.body.classList.add('print-a4');
+      } else if (mode === 'STICKER') {
+          document.body.classList.add('print-sticker');
       } else {
-          document.body.classList.remove('print-a4');
+          document.body.classList.add('print-slip');
       }
       window.print();
-      document.body.classList.remove('print-a4');
+      document.body.className = ''; // Cleanup after print
   }
 
   const handleVoidSale = () => {
@@ -402,6 +419,25 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-9rem)] gap-6 animate-fade-in pb-2 relative">
       
+      {/* Instruction Editor Modal */}
+      {editingInstructionId && (
+          <div className="absolute inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6">
+                  <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Edit3 className="w-5 h-5 text-blue-600"/> Edit Dosage Instruction</h3>
+                  <textarea 
+                      className="w-full h-32 p-3 bg-slate-50 border border-slate-200 rounded-xl mb-4 text-sm"
+                      value={tempInstruction}
+                      onChange={e => setTempInstruction(e.target.value)}
+                      placeholder="e.g. Take 1 tablet daily"
+                  />
+                  <div className="flex gap-2">
+                      <button onClick={saveInstruction} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl">Save</button>
+                      <button onClick={() => setEditingInstructionId(null)} className="flex-1 py-3 text-slate-500 font-bold rounded-xl border border-slate-200">Cancel</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Held Bills Modal */}
       {showHeldBillsModal && (
           <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -644,9 +680,14 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                  <p className="text-center text-slate-500 mb-6">
                      {lastSale.change ? `Change: ฿${lastSale.change.toLocaleString()}` : 'Completed'}
                  </p>
-                 <button onClick={handlePrint} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl mb-3 flex items-center justify-center gap-2">
-                     <Printer className="w-4 h-4"/> {printMode === 'A4' ? 'Print Full Invoice' : 'Print Slip'}
-                 </button>
+                 <div className="space-y-2 mb-3">
+                    <button onClick={() => handlePrint(printMode)} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl flex items-center justify-center gap-2">
+                        <Printer className="w-4 h-4"/> {printMode === 'A4' ? 'Print Full Invoice' : 'Print Slip'}
+                    </button>
+                    <button onClick={() => handlePrint('STICKER')} className="w-full py-3 bg-teal-600 text-white font-bold rounded-xl flex items-center justify-center gap-2">
+                        <Tag className="w-4 h-4"/> Print Drug Labels
+                    </button>
+                 </div>
                  <button onClick={() => setShowReceipt(false)} className="w-full py-3 border border-slate-200 text-slate-600 font-bold rounded-xl">Close</button>
              </div>
              
@@ -684,6 +725,31 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                     </div>
                  )}
                  <div className="receipt-footer">{state.settings.receiptFooter}</div>
+             </div>
+
+             {/* Hidden Print Area: Drug Labels (Stickers) */}
+             <div id="printable-stickers" className="hidden">
+                 {lastSale.items.map((item, idx) => {
+                     // If item requires instruction (medicine), print a sticker. Skip if it's general merchandise without instruction.
+                     // For demo, we print for everything that has an instruction.
+                     if(!item.instruction) return null;
+                     return (
+                         <div key={idx} className="sticker-item">
+                             <div className="sticker-header">
+                                 {state.settings.storeName} | {state.settings.phone}
+                             </div>
+                             <div className="sticker-drug-name">
+                                 {item.name}
+                             </div>
+                             <div className="sticker-instruction">
+                                 วิธีใช้: {item.instruction}
+                             </div>
+                             <div className="sticker-footer">
+                                 Date: {lastSale.date.split(' ')[0]} | Qty: {item.quantity} | {selectedCustomer?.name || 'Customer'}
+                             </div>
+                         </div>
+                     );
+                 })}
              </div>
 
              {/* Hidden Print Area: A4 Full Tax Invoice */}
@@ -922,7 +988,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                 </div>
             ) : (
                 cart.map(item => (
-                    <div key={item.id} className="flex flex-col p-2 hover:bg-slate-50 rounded-xl transition-colors group">
+                    <div key={item.id} className="flex flex-col p-2 hover:bg-slate-50 rounded-xl transition-colors group relative">
                         <div className="flex justify-between items-center mb-1">
                             <div className="flex-1 pr-4">
                                 <h4 className="font-bold text-slate-700 text-sm line-clamp-1">{item.name}</h4>
@@ -936,6 +1002,12 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                                 </div>
                                 <button onClick={() => removeFromCart(item.id)} className="text-slate-300 hover:text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
                             </div>
+                        </div>
+                        {/* Instruction Link */}
+                        <div className="flex items-center gap-2 mt-1">
+                            <button onClick={() => openInstructionEditor(item)} className="text-[10px] text-blue-600 flex items-center gap-1 hover:underline bg-blue-50 px-2 py-0.5 rounded">
+                                <Edit3 className="w-3 h-3"/> {item.instruction ? item.instruction : 'Add Instruction'}
+                            </button>
                         </div>
                     </div>
                 ))

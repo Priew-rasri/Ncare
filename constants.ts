@@ -1,5 +1,4 @@
 
-
 import { Product, ProductCategory, Customer, PurchaseOrder, SaleRecord, Expense, Branch, Supplier, StockLog, Settings, Shift, User } from './types';
 
 export const MOCK_USERS: User[] = [
@@ -46,7 +45,8 @@ export const MOCK_INVENTORY: Product[] = [
     unit: 'แผง',
     requiresPrescription: false,
     drugInteractions: ['Warfarin', 'Alcohol'],
-    isVatExempt: true, // Medicine often exempt
+    isVatExempt: true,
+    defaultInstruction: 'รับประทานครั้งละ 1-2 เม็ด ทุก 4-6 ชม. เวลาปวด',
     batches: [
         { lotNumber: 'L23001', expiryDate: '2025-12-31', quantity: 100, costPrice: 8 },
         { lotNumber: 'L22055', expiryDate: '2024-11-30', quantity: 20, costPrice: 7.5 },
@@ -67,7 +67,8 @@ export const MOCK_INVENTORY: Product[] = [
     unit: 'แผง',
     requiresPrescription: true,
     drugInteractions: ['Warfarin', 'Methotrexate'],
-    isVatExempt: true, // Medicine often exempt
+    isVatExempt: true,
+    defaultInstruction: 'รับประทานครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร เช้า-กลางวัน-เย็น',
     batches: [
         { lotNumber: 'A9901', expiryDate: '2024-10-15', quantity: 45, costPrice: 45 }
     ]
@@ -86,7 +87,8 @@ export const MOCK_INVENTORY: Product[] = [
     minStock: 10,
     unit: 'กระปุก',
     requiresPrescription: false,
-    isVatExempt: false, // Supplement has VAT
+    isVatExempt: false,
+    defaultInstruction: 'รับประทานวันละ 1 เม็ด พร้อมอาหาร',
     batches: [
          { lotNumber: 'V8821', expiryDate: '2026-05-20', quantity: 20, costPrice: 200 }
     ]
@@ -105,7 +107,7 @@ export const MOCK_INVENTORY: Product[] = [
     minStock: 100,
     unit: 'ชิ้น',
     requiresPrescription: false,
-    isVatExempt: false, // Equipment has VAT
+    isVatExempt: false,
     batches: [
          { lotNumber: 'M1123', expiryDate: '2030-01-01', quantity: 500, costPrice: 10 }
     ]
@@ -144,7 +146,8 @@ export const MOCK_INVENTORY: Product[] = [
     minStock: 5,
     unit: 'หลอด',
     requiresPrescription: false,
-    isVatExempt: false, // Cosmetic has VAT
+    isVatExempt: false,
+    defaultInstruction: 'ทาบริเวณที่แห้ง วันละ 2-3 ครั้ง',
     batches: [
         { lotNumber: 'CR009', expiryDate: '2025-08-10', quantity: 15, costPrice: 500 }
     ]
@@ -216,8 +219,8 @@ const generateMockSales = (): SaleRecord[] => {
                 vatAmount: hasVat ? total * 0.066 : 0,
                 paymentMethod: Math.random() > 0.5 ? 'QR' : 'CASH',
                 items: [
-                   { ...MOCK_INVENTORY[0], quantity: 2 },
-                   { ...MOCK_INVENTORY[2], quantity: 1 }
+                   { ...MOCK_INVENTORY[0], quantity: 2, instruction: MOCK_INVENTORY[0].defaultInstruction },
+                   { ...MOCK_INVENTORY[2], quantity: 1, instruction: MOCK_INVENTORY[2].defaultInstruction }
                 ],
                 branchId: 'B001',
                 status: 'COMPLETED'
