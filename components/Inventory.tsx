@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { GlobalState, TransferRequest, Product, ProductCategory, Batch } from '../types';
 import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight, TrendingUp, PieChart, Truck, ArrowLeftRight, Printer, Tag, FileText, AlertOctagon, Plus, Edit, Trash2 } from 'lucide-react';
@@ -205,7 +206,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
             <tbody className="divide-y divide-slate-100">
               {getFilteredInventory().map((item) => (
                 <React.Fragment key={item.id}>
-                    <tr className={`hover:bg-slate-50 cursor-pointer ${expandedRow === item.id ? 'bg-slate-50' : ''}`} onClick={() => toggleRow(item.id)}>
+                    <tr className={`hover:bg-slate-50 cursor-pointer ${expandedRow === item.id ? 'bg-slate-50' : ''} ${item.stock <= item.minStock ? 'bg-red-50/50' : ''}`} onClick={() => toggleRow(item.id)}>
                         <td className="px-6 py-4 text-center"><ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${expandedRow === item.id ? 'rotate-180' : ''}`} /></td>
                         <td className="px-6 py-4">
                             <div className="font-bold text-slate-800 text-sm">{item.name}</div>
@@ -220,7 +221,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                         <td className="px-6 py-4 text-right text-slate-500">฿{item.cost}</td>
                         <td className="px-6 py-4 text-right font-bold text-blue-600">฿{item.price}</td>
                         <td className="px-6 py-4 text-right">
-                             <span className={`font-bold px-2 py-1 rounded ${item.stock <= item.minStock ? 'bg-red-100 text-red-600' : 'text-slate-800'}`}>
+                             <span className={`font-bold px-2 py-1 rounded ${item.stock <= item.minStock ? 'bg-red-100 text-red-600 animate-pulse' : 'text-slate-800'}`}>
                                  {item.stock} {item.unit}
                              </span>
                         </td>

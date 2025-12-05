@@ -239,6 +239,7 @@ export interface Settings {
   vatRate: number;
   printerIp: string;
   receiptFooter: string;
+  roundingType: 'NONE' | 'ROUND_DOWN_INT' | 'ROUND_0_25'; // New field
 }
 
 export interface Notification {

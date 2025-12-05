@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { GlobalState, Settings as SettingsType } from '../types';
-import { Save, Store, Receipt, Printer, Info, CheckCircle, Shield, FileText, Database, Download, Upload, AlertTriangle } from 'lucide-react';
+import { Save, Store, Receipt, Printer, Info, CheckCircle, Shield, FileText, Database, Download, Upload, AlertTriangle, Coins } from 'lucide-react';
 
 interface SettingsProps {
     data: GlobalState;
@@ -132,7 +132,20 @@ const Settings: React.FC<SettingsProps> = ({ data, dispatch }) => {
                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none" 
                         />
                     </div>
-                        <div className="md:col-span-2">
+                    <div>
+                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-2"><Coins className="w-4 h-4"/> Cash Rounding Policy</label>
+                         <select 
+                            value={form.roundingType || 'NONE'}
+                            onChange={(e) => handleChange('roundingType', e.target.value)}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                         >
+                             <option value="NONE">No Rounding (Exact Amount)</option>
+                             <option value="ROUND_DOWN_INT">Round Down to Integer (ตัดเศษสตางค์ทิ้ง)</option>
+                             <option value="ROUND_0_25">Round to nearest 0.25 (ปัดเศษ 25 สตางค์)</option>
+                         </select>
+                         <p className="text-[10px] text-slate-400 mt-1">Applies only to cash payments.</p>
+                    </div>
+                    <div className="md:col-span-2">
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Receipt Footer Message</label>
                         <input 
                             type="text" 

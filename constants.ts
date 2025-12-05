@@ -20,7 +20,8 @@ export const MOCK_SETTINGS: Settings = {
     phone: '02-888-9999',
     vatRate: 7,
     printerIp: '192.168.1.200',
-    receiptFooter: 'Ncare - We Care for Your Life. ปรึกษาเภสัชกรได้ตลอด 24 ชม.'
+    receiptFooter: 'Ncare - We Care for Your Life. ปรึกษาเภสัชกรได้ตลอด 24 ชม.',
+    roundingType: 'NONE'
 };
 
 export const MOCK_SUPPLIERS: Supplier[] = [

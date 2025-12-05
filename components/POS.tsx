@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { GlobalState, Product, CartItem, SaleRecord, Shift, HeldBill } from '../types';
-import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan, Edit3, Sticker, UploadCloud, FileCheck, Camera, History, AlertTriangle, FileText, Briefcase, Coins, ArrowRightLeft, MousePointerClick, Tag, LogOut } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan, Edit3, Sticker, UploadCloud, FileCheck, Camera, History, AlertTriangle, FileText, Briefcase, Coins, ArrowRightLeft, MousePointerClick, Tag, LogOut, Keyboard, HelpCircle } from 'lucide-react';
 
 interface POSProps {
   state: GlobalState;
@@ -31,6 +31,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [showRxUpload, setShowRxUpload] = useState(false);
   const [showCashOpsModal, setShowCashOpsModal] = useState(false);
   const [showHeldBillsModal, setShowHeldBillsModal] = useState(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
   // Instruction Editor
   const [editingInstructionId, setEditingInstructionId] = useState<string | null>(null);
@@ -47,6 +48,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [showTaxInvoiceForm, setShowTaxInvoiceForm] = useState(false);
   const [taxDetails, setTaxDetails] = useState({ name: '', taxId: '', address: '' });
   const [printMode, setPrintMode] = useState<'SLIP' | 'A4' | 'STICKER' | 'Z_REPORT'>('SLIP');
+  const [roundedNetTotal, setRoundedNetTotal] = useState(0);
 
   // Void Reason
   const [voidReason, setVoidReason] = useState('');
@@ -81,6 +83,22 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
         if (e.key === 'F9') {
             e.preventDefault();
             if (cart.length > 0) handleHoldBill();
+        }
+
+        // ?: Shortcuts Help
+        if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+            e.preventDefault();
+            setShowShortcutsModal(prev => !prev);
+        }
+
+        // Esc: Close Modals
+        if (e.key === 'Escape') {
+            setShowPaymentModal(false);
+            setShowQRModal(false);
+            setShowHistoryModal(false);
+            setShowHeldBillsModal(false);
+            setShowCashOpsModal(false);
+            setShowShortcutsModal(false);
         }
     };
 
@@ -178,6 +196,15 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
 
   const { total: cartTotal, discount, netTotal } = calculateTotals(cart);
 
+  const applyRounding = (amount: number) => {
+      const type = state.settings.roundingType;
+      if (type === 'ROUND_DOWN_INT') return Math.floor(amount);
+      if (type === 'ROUND_0_25') {
+          return Math.round(amount * 4) / 4;
+      }
+      return amount;
+  };
+
   const addToCart = (product: Product) => {
     const existingQty = cart.find(x => x.id === product.id)?.quantity || 0;
     if (existingQty + 1 > product.stock) {
@@ -198,11 +225,11 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     const interactingItem = cart.find(cartItem => {
         // Check if new product interacts with existing item
         const conflictA = product.drugInteractions?.some(interaction => 
-            cartItem.genericName.toLowerCase().includes(interaction.toLowerCase())
+            cartItem.genericName.toLowerCase().replace(/\s/g, '').includes(interaction.toLowerCase().replace(/\s/g, ''))
         );
         // Check if existing item interacts with new product
         const conflictB = cartItem.drugInteractions?.some(interaction => 
-            product.genericName.toLowerCase().includes(interaction.toLowerCase())
+            product.genericName.toLowerCase().replace(/\s/g, '').includes(interaction.toLowerCase().replace(/\s/g, ''))
         );
         return conflictA || conflictB;
     });
@@ -319,6 +346,10 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
           setQrAmount(netTotal);
           setShowQRModal(true);
       } else if (method === 'CASH') {
+          // Calculate rounding only for cash
+          const rounded = applyRounding(netTotal);
+          setRoundedNetTotal(rounded);
+          
           setShowPaymentModal(true);
           setTenderedAmount('');
       } else {
@@ -329,6 +360,12 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const completeCheckout = (method: 'CASH' | 'QR' | 'CREDIT', tendered?: number, change?: number) => {
     const { total, totalExempt, totalVatable, subtotalVatableBase, vatAmount, discount, pointsToRedeem, netTotal } = calculateTotals(cart);
 
+    // Use rounded total for cash if applied
+    const finalNetTotal = method === 'CASH' ? roundedNetTotal : netTotal;
+    
+    // Adjust change calculation if rounding occurred
+    const finalChange = method === 'CASH' && tendered ? tendered - finalNetTotal : change;
+
     const sale: SaleRecord = {
       id: 'PENDING', // Will be replaced by reducer
       date: new Date().toLocaleString('th-TH'),
@@ -336,13 +373,13 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       total: total,
       discount: discount,
       pointsRedeemed: pointsToRedeem,
-      netTotal: netTotal,
+      netTotal: finalNetTotal, // Store rounded total
       subtotalExempt: totalExempt,
       subtotalVatable: subtotalVatableBase,
       vatAmount: vatAmount,
       paymentMethod: method,
       tenderedAmount: tendered,
-      change: change,
+      change: finalChange,
       customerId: selectedCustomerId || undefined,
       branchId: state.currentBranch.id,
       shiftId: activeShift?.id,
@@ -519,6 +556,30 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-9rem)] gap-6 animate-fade-in pb-2 relative">
       
+      {/* Shortcuts Help Modal */}
+      {showShortcutsModal && (
+        <div className="absolute inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+             <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 relative">
+                 <button onClick={() => setShowShortcutsModal(false)} className="absolute right-4 top-4 text-slate-400"><X className="w-6 h-6"/></button>
+                 <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><Keyboard className="w-6 h-6 text-blue-600"/> Keyboard Shortcuts</h3>
+                 <div className="space-y-3">
+                     {[
+                         { key: 'F2', desc: 'Search / Scan Barcode' },
+                         { key: 'F4', desc: 'Pay Cash Immediately' },
+                         { key: 'F9', desc: 'Hold Bill (Pause)' },
+                         { key: 'Esc', desc: 'Close Modal / Cancel' },
+                         { key: 'Shift + /', desc: 'Show this Help Menu (?)' }
+                     ].map(sc => (
+                         <div key={sc.key} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                             <span className="font-mono font-bold bg-white border-2 border-slate-200 px-2 py-1 rounded text-slate-700">{sc.key}</span>
+                             <span className="text-slate-600 font-medium text-sm">{sc.desc}</span>
+                         </div>
+                     ))}
+                 </div>
+             </div>
+        </div>
+      )}
+
       {/* QR Payment Modal */}
       {showQRModal && (
         <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -690,7 +751,10 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                    
                    <div className="bg-slate-50 p-4 rounded-xl mb-6 text-center">
                        <span className="text-sm text-slate-500 font-bold uppercase">Total Amount</span>
-                       <div className="text-4xl font-bold text-slate-900">฿{netTotal.toLocaleString()}</div>
+                       <div className="text-4xl font-bold text-slate-900">฿{roundedNetTotal.toLocaleString()}</div>
+                       {state.settings.roundingType !== 'NONE' && roundedNetTotal !== netTotal && (
+                           <div className="text-xs text-orange-500 font-bold mt-1">Rounded from ฿{netTotal.toLocaleString()}</div>
+                       )}
                    </div>
 
                    <div className="mb-6">
@@ -713,14 +777,14 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                                    ฿{amt}
                                </button>
                            ))}
-                           <button onClick={() => setTenderedAmount(netTotal.toString())} className="flex-1 py-2 bg-blue-50 rounded-lg text-sm font-bold text-blue-600 hover:bg-blue-100">Exact</button>
+                           <button onClick={() => setTenderedAmount(roundedNetTotal.toString())} className="flex-1 py-2 bg-blue-50 rounded-lg text-sm font-bold text-blue-600 hover:bg-blue-100">Exact</button>
                        </div>
                    </div>
 
-                   {Number(tenderedAmount) >= netTotal && (
+                   {Number(tenderedAmount) >= roundedNetTotal && (
                        <div className="bg-green-50 p-4 rounded-xl mb-6 flex justify-between items-center border border-green-100 animate-fade-in">
                            <span className="text-green-700 font-bold uppercase text-sm">Change Due (เงินทอน)</span>
-                           <span className="text-2xl font-bold text-green-700">฿{(Number(tenderedAmount) - netTotal).toLocaleString()}</span>
+                           <span className="text-2xl font-bold text-green-700">฿{(Number(tenderedAmount) - roundedNetTotal).toLocaleString()}</span>
                        </div>
                    )}
 
@@ -759,10 +823,10 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                    </div>
 
                    <button 
-                       disabled={Number(tenderedAmount) < netTotal}
+                       disabled={Number(tenderedAmount) < roundedNetTotal}
                        onClick={() => {
                            setPrintMode(showTaxInvoiceForm ? 'A4' : 'SLIP');
-                           completeCheckout('CASH', Number(tenderedAmount), Number(tenderedAmount) - netTotal);
+                           completeCheckout('CASH', Number(tenderedAmount), Number(tenderedAmount) - roundedNetTotal);
                        }}
                        className="w-full py-4 bg-green-600 text-white font-bold text-lg rounded-xl shadow-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                    >
@@ -1073,6 +1137,13 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     autoFocus
                 />
+                 <button 
+                    onClick={() => setShowShortcutsModal(true)}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-blue-600"
+                    title="Keyboard Shortcuts (Shift + /)"
+                >
+                    <HelpCircle className="w-5 h-5" />
+                </button>
             </div>
             {/* Horizontal Scrollable Category Filter */}
             <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
