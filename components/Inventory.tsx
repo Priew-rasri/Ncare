@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { GlobalState } from '../types';
-import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X } from 'lucide-react';
+import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight } from 'lucide-react';
 
 interface InventoryProps {
   data: GlobalState;
@@ -9,7 +9,7 @@ interface InventoryProps {
 }
 
 const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
-  const [activeTab, setActiveTab] = useState<'STOCK' | 'MOVEMENT'>('STOCK');
+  const [activeTab, setActiveTab] = useState<'STOCK' | 'MOVEMENT' | 'EXPIRY'>('STOCK');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   
   // Adjustment Modal State
@@ -217,6 +217,70 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
     </div>
   );
 
+  const renderExpiryRisk = () => {
+      // Flatten inventory to find batches near expiry
+      const expiringBatches = data.inventory.flatMap(item => 
+          item.batches.map(batch => ({
+              ...batch,
+              productName: item.name,
+              productId: item.id,
+              daysRemaining: Math.ceil((new Date(batch.expiryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24))
+          }))
+      ).sort((a, b) => a.daysRemaining - b.daysRemaining);
+
+      return (
+        <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                <div>
+                    <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2"><Calendar className="w-5 h-5 text-red-500"/> Expiry Risk Management</h3>
+                    <p className="text-xs text-slate-400 mt-1">Batches expiring within 6 months sorted by risk</p>
+                </div>
+                <div className="flex gap-2">
+                    <button className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 border border-red-100 rounded-lg text-sm font-bold hover:bg-red-100">
+                        Generate Return List
+                    </button>
+                </div>
+            </div>
+            <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase text-slate-500">
+                    <tr>
+                        <th className="px-6 py-4 font-bold">Product Name</th>
+                        <th className="px-6 py-4 font-bold">Lot Number</th>
+                        <th className="px-6 py-4 font-bold">Expiry Date</th>
+                        <th className="px-6 py-4 font-bold">Days Left</th>
+                        <th className="px-6 py-4 font-bold text-right">Quantity</th>
+                        <th className="px-6 py-4 font-bold text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                    {expiringBatches.map((batch, idx) => (
+                        <tr key={idx} className={`hover:bg-slate-50 ${batch.daysRemaining < 0 ? 'bg-red-50/30' : ''}`}>
+                            <td className="px-6 py-4 font-bold text-slate-700">{batch.productName}</td>
+                            <td className="px-6 py-4 font-mono text-slate-500 text-xs">{batch.lotNumber}</td>
+                            <td className="px-6 py-4 text-slate-600">{batch.expiryDate}</td>
+                            <td className="px-6 py-4">
+                                {batch.daysRemaining < 0 ? (
+                                    <span className="text-red-600 font-bold bg-red-100 px-2 py-0.5 rounded text-xs">EXPIRED</span>
+                                ) : batch.daysRemaining < 90 ? (
+                                    <span className="text-orange-600 font-bold">{batch.daysRemaining} days</span>
+                                ) : (
+                                    <span className="text-green-600">{batch.daysRemaining} days</span>
+                                )}
+                            </td>
+                            <td className="px-6 py-4 text-right font-bold text-slate-800">{batch.quantity}</td>
+                            <td className="px-6 py-4 text-center">
+                                <button className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center justify-center gap-1 mx-auto">
+                                    Return <ArrowRight className="w-3 h-3"/>
+                                </button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+      );
+  };
+
   return (
     <div className="space-y-6 animate-fade-in pb-10 relative">
       {/* Stock Adjustment Modal */}
@@ -307,11 +371,19 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                 >
                     Movement History
                 </button>
+                <button 
+                    onClick={() => setActiveTab('EXPIRY')}
+                    className={`px-5 py-2 rounded-full text-xs font-bold transition-all ${activeTab === 'EXPIRY' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                    Expiry Risk
+                </button>
              </div>
         </div>
       </div>
 
-      {activeTab === 'STOCK' ? renderStockTable() : renderMovementLog()}
+      {activeTab === 'STOCK' && renderStockTable()}
+      {activeTab === 'MOVEMENT' && renderMovementLog()}
+      {activeTab === 'EXPIRY' && renderExpiryRisk()}
     </div>
   );
 };

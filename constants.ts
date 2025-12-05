@@ -197,11 +197,16 @@ const generateMockSales = (): SaleRecord[] => {
         for (let j = 0; j < dailyCount; j++) {
             const hasVat = Math.random() > 0.5;
             const total = 500 + Math.floor(Math.random() * 1000);
+            const discount = 0;
+            const netTotal = total - discount;
             
             sales.push({
                 id: `INV-${date.getFullYear()}${date.getMonth()}${date.getDate()}-${j}`,
                 date: dateStr,
                 total: total,
+                discount: discount,
+                pointsRedeemed: 0,
+                netTotal: netTotal,
                 subtotalVatable: hasVat ? total * 0.934 : 0,
                 subtotalExempt: hasVat ? 0 : total,
                 vatAmount: hasVat ? total * 0.066 : 0,

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { GlobalState, Product, CartItem, SaleRecord, Shift } from '../types';
-import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent } from 'lucide-react';
+import { GlobalState, Product, CartItem, SaleRecord, Shift, HeldBill } from '../types';
+import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift } from 'lucide-react';
 
 interface POSProps {
   state: GlobalState;
@@ -14,6 +14,12 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [needsPrescription, setNeedsPrescription] = useState(false);
   const [activeCategory, setActiveCategory] = useState('ALL');
+  
+  // Feature: Point Redemption
+  const [usePoints, setUsePoints] = useState(false);
+  
+  // Feature: Hold Bill
+  const [showHeldBills, setShowHeldBills] = useState(false);
   
   // Shift State
   const [openShiftAmount, setOpenShiftAmount] = useState<number>(1000);
@@ -55,16 +61,45 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
               totalVatable += lineTotal;
           }
       });
+      
+      // Points Logic
+      let discount = 0;
+      let pointsToRedeem = 0;
+      if (usePoints && selectedCustomer && selectedCustomer.points > 0) {
+          // Rule: 10 Points = 1 THB Discount
+          // Rule: Max discount 20% of bill
+          const maxDiscount = total * 0.2;
+          const potentialDiscount = selectedCustomer.points / 10;
+          
+          discount = Math.min(maxDiscount, potentialDiscount);
+          discount = Math.floor(discount); // Round down to whole Baht
+          pointsToRedeem = discount * 10;
+      }
+      
+      const netTotal = total - discount;
 
-      // Calculate VAT from Inclusive Price: Price * 7 / 107
+      // Calculate VAT from Net Price (Assume discount applies proportionally or to vatable items first - simplified here to apply to total for easy display)
+      // In a strict invoice, we usually apply discount before tax or after. 
+      // Tax Base = (Vatable Sales - Vatable Discount) * 100 / 107.
+      // For simplicity: We assume discount reduces the Vatable portion primarily (common in retail).
+      
+      // Pro-rate discount
+      const vatableRatio = total > 0 ? totalVatable / total : 0;
+      const discountVatable = discount * vatableRatio;
+      const netVatable = totalVatable - discountVatable;
+      
       const vatRate = state.settings.vatRate || 7;
-      const vatAmount = totalVatable * (vatRate / (100 + vatRate));
-      const subtotalVatableBase = totalVatable - vatAmount;
+      const vatAmount = netVatable * (vatRate / (100 + vatRate));
+      const subtotalVatableBase = netVatable - vatAmount;
+      
+      // Exempt portion
+      const discountExempt = discount - discountVatable;
+      const netExempt = totalExempt - discountExempt;
 
-      return { total, totalExempt, totalVatable, subtotalVatableBase, vatAmount };
+      return { total, totalExempt: netExempt, totalVatable, subtotalVatableBase, vatAmount, discount, pointsToRedeem, netTotal };
   };
 
-  const { total: cartTotal, totalExempt, vatAmount, subtotalVatableBase } = calculateTotals(cart);
+  const { total: cartTotal, totalExempt, vatAmount, subtotalVatableBase, discount, pointsToRedeem, netTotal } = calculateTotals(cart);
 
   const getAllergyWarnings = (product: Product) => {
       if (!selectedCustomer) return null;
@@ -136,17 +171,43 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     }));
   };
 
+  const handleHoldBill = () => {
+      if (cart.length === 0) return;
+      const heldBill: HeldBill = {
+          id: `HOLD-${Date.now().toString().substr(-5)}`,
+          timestamp: new Date().toLocaleTimeString('th-TH'),
+          items: cart,
+          customer: selectedCustomer,
+          note: 'Customer paused checkout'
+      };
+      dispatch({ type: 'HOLD_BILL', payload: heldBill });
+      setCart([]);
+      setSelectedCustomerId('');
+      setUsePoints(false);
+      setNeedsPrescription(false);
+  };
+
+  const handleResumeBill = (bill: HeldBill) => {
+      setCart(bill.items);
+      if (bill.customer) setSelectedCustomerId(bill.customer.id);
+      dispatch({ type: 'RESUME_BILL', payload: bill.id });
+      setShowHeldBills(false);
+  };
+
   const handleCheckout = (method: 'CASH' | 'QR' | 'CREDIT') => {
     if (cart.length === 0) return;
     if (needsPrescription && !window.confirm("กรุณายืนยันว่าเภสัชกรได้ตรวจสอบใบสั่งแพทย์แล้ว?")) return;
 
-    const { total, totalExempt, totalVatable, subtotalVatableBase, vatAmount } = calculateTotals(cart);
+    const { total, totalExempt, totalVatable, subtotalVatableBase, vatAmount, discount, pointsToRedeem, netTotal } = calculateTotals(cart);
 
     const sale: SaleRecord = {
       id: `INV-${Date.now()}`,
       date: new Date().toLocaleString('th-TH'),
       items: cart,
-      total: total,
+      total: total, // Gross
+      discount: discount,
+      pointsRedeemed: pointsToRedeem,
+      netTotal: netTotal,
       
       // Tax Breakdown
       subtotalExempt: totalExempt,
@@ -163,18 +224,13 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     cart.forEach(item => {
       dispatch({ type: 'UPDATE_STOCK', payload: { productId: item.id, quantity: -item.quantity } });
     });
-    if (selectedCustomerId) {
-        dispatch({ 
-            type: 'UPDATE_CUSTOMER_POINTS', 
-            payload: { customerId: selectedCustomerId, points: Math.floor(total / 20), spent: total } 
-        });
-    }
 
     setLastSale(sale);
     setShowReceipt(true);
     setCart([]);
     setSelectedCustomerId('');
     setNeedsPrescription(false);
+    setUsePoints(false);
   };
 
   const handleOpenShift = () => {
@@ -226,6 +282,43 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-9rem)] gap-6 animate-fade-in pb-2 relative">
       
+      {/* Held Bills Modal */}
+      {showHeldBills && (
+          <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+               <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-6 animate-fade-in">
+                   <div className="flex justify-between items-center mb-6">
+                       <h3 className="text-xl font-bold text-slate-800">Held Bills (พักบิล)</h3>
+                       <button onClick={() => setShowHeldBills(false)}><X className="w-6 h-6 text-slate-400" /></button>
+                   </div>
+                   {state.heldBills.length === 0 ? (
+                       <div className="text-center py-8 text-slate-400">No held bills</div>
+                   ) : (
+                       <div className="space-y-3">
+                           {state.heldBills.map(bill => (
+                               <div key={bill.id} className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                   <div>
+                                       <div className="flex items-center gap-2">
+                                           <span className="font-bold text-slate-800">{bill.timestamp}</span>
+                                           <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">{bill.id}</span>
+                                       </div>
+                                       <div className="text-sm text-slate-500 mt-1">
+                                           {bill.customer ? bill.customer.name : 'Walk-in Customer'} • {bill.items.length} Items
+                                       </div>
+                                   </div>
+                                   <div className="flex gap-2">
+                                       <button onClick={() => dispatch({type: 'DELETE_HELD_BILL', payload: bill.id})} className="p-2 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 className="w-5 h-5"/></button>
+                                       <button onClick={() => handleResumeBill(bill)} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow flex items-center gap-2">
+                                           <PlayCircle className="w-4 h-4"/> Resume
+                                       </button>
+                                   </div>
+                               </div>
+                           ))}
+                       </div>
+                   )}
+               </div>
+          </div>
+      )}
+
       {/* Close Shift Modal */}
       {showCloseShiftModal && (
            <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -302,6 +395,23 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                             </div>
                         ))}
                     </div>
+
+                    <div className="border-t border-slate-100 pt-3 mb-3 space-y-1">
+                        <div className="flex justify-between text-sm">
+                             <span className="text-slate-500">Subtotal</span>
+                             <span className="font-bold text-slate-800">฿{lastSale.total.toLocaleString()}</span>
+                        </div>
+                        {lastSale.discount > 0 && (
+                            <div className="flex justify-between text-sm text-green-600">
+                                <span className="font-bold">Discount (Points)</span>
+                                <span className="font-bold">-฿{lastSale.discount.toLocaleString()}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between items-center text-lg font-bold text-slate-900 pt-2 border-t border-dashed border-slate-200 mt-2">
+                            <span>Net Total</span>
+                            <span className="text-blue-600">฿{lastSale.netTotal.toLocaleString()}</span>
+                        </div>
+                    </div>
                     
                     {/* Tax Breakdown Section */}
                     <div className="bg-slate-50 p-3 rounded-lg mb-4 text-xs space-y-1 border border-slate-100">
@@ -313,16 +423,8 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                             <span>VAT (7%)</span>
                             <span>฿{lastSale.vatAmount.toFixed(2)}</span>
                          </div>
-                         <div className="flex justify-between text-slate-500">
-                            <span>Exempt/Non-VAT</span>
-                            <span>฿{lastSale.subtotalExempt.toFixed(2)}</span>
-                         </div>
                     </div>
 
-                    <div className="flex justify-between items-center text-lg font-bold text-slate-900 pt-2 border-t border-slate-100 mb-2">
-                        <span>Total Paid</span>
-                        <span className="text-blue-600">฿{lastSale.total.toLocaleString()}</span>
-                    </div>
                     <div className="text-xs text-center text-slate-400 mt-4 italic">
                         {state.settings.receiptFooter}
                     </div>
@@ -449,6 +551,29 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
 
       {/* Cart Section */}
       <div className="lg:w-1/3 flex flex-col h-full bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 overflow-hidden relative z-20">
+        
+        {/* Action Bar: Hold/Resume */}
+        <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex justify-end gap-2">
+            <button 
+                onClick={() => setShowHeldBills(true)}
+                className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:bg-white hover:shadow-sm px-3 py-1.5 rounded-lg transition-all relative"
+            >
+                <Clock className="w-3.5 h-3.5" /> Recalls
+                {state.heldBills.length > 0 && (
+                    <span className="bg-red-500 text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full absolute -top-1 -right-1">
+                        {state.heldBills.length}
+                    </span>
+                )}
+            </button>
+             <button 
+                onClick={handleHoldBill}
+                disabled={cart.length === 0}
+                className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:bg-white hover:shadow-sm px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
+            >
+                <PauseCircle className="w-3.5 h-3.5" /> Hold Bill
+            </button>
+        </div>
+
         <div className="p-5 border-b border-slate-100 bg-white">
             <div className="relative mb-4">
                 <select 
@@ -537,15 +662,36 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
         </div>
 
         <div className="p-6 bg-slate-50 border-t border-slate-200">
-            {/* Tax Summary Mini-view */}
-            <div className="flex justify-between items-center mb-3 text-xs text-slate-400">
-                 <span>VAT 7%: ฿{vatAmount.toFixed(2)}</span>
-                 <span>Exempt: ฿{totalExempt.toFixed(2)}</span>
-            </div>
+            {/* Point Redemption Checkbox */}
+            {selectedCustomer && selectedCustomer.points >= 10 && cart.length > 0 && (
+                <div className="mb-4 bg-white p-3 rounded-xl border border-blue-100 flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-2">
+                        <Gift className="w-4 h-4 text-blue-600" />
+                        <span className="text-xs font-bold text-slate-700">Use {Math.min(cartTotal * 2, selectedCustomer.points)} Points?</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" checked={usePoints} onChange={() => setUsePoints(!usePoints)} className="sr-only peer" />
+                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+            )}
 
-            <div className="flex justify-between items-end mb-6">
-                <span className="text-slate-500 text-sm font-medium">Net Total <span className="text-xs text-slate-400">(Inc. VAT)</span></span>
-                <span className="text-3xl font-bold text-slate-900 tracking-tight">฿{cartTotal.toLocaleString()}</span>
+            {/* Total Summary */}
+            <div className="space-y-1 mb-6">
+                 <div className="flex justify-between items-end">
+                    <span className="text-slate-500 text-sm font-medium">Subtotal</span>
+                    <span className="font-bold text-slate-800">฿{cartTotal.toLocaleString()}</span>
+                 </div>
+                 {discount > 0 && (
+                     <div className="flex justify-between items-end text-green-600">
+                        <span className="text-xs font-bold flex items-center gap-1"><Percent className="w-3 h-3"/> Discount</span>
+                        <span className="font-bold">-฿{discount.toLocaleString()}</span>
+                     </div>
+                 )}
+                 <div className="flex justify-between items-end pt-2 border-t border-slate-200">
+                    <span className="text-slate-900 text-lg font-bold">Net Total</span>
+                    <span className="text-3xl font-bold text-blue-600 tracking-tight">฿{netTotal.toLocaleString()}</span>
+                 </div>
             </div>
             
             <div className="grid grid-cols-3 gap-3">

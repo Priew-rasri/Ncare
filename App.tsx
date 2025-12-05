@@ -9,7 +9,7 @@ import Accounting from './components/Accounting';
 import AIAssistant from './components/AIAssistant';
 import Settings from './components/Settings';
 import { MOCK_INVENTORY, MOCK_CUSTOMERS, MOCK_SALES, MOCK_PO, MOCK_EXPENSES, MOCK_BRANCHES, MOCK_SUPPLIERS, MOCK_STOCK_LOGS, MOCK_SETTINGS, MOCK_SHIFTS } from './constants';
-import { GlobalState, Action, StockLog, Shift } from './types';
+import { GlobalState, Action, StockLog, Shift, Customer } from './types';
 import { Search, Bell, MapPin, ChevronDown, Menu } from 'lucide-react';
 
 // Reducer
@@ -32,15 +32,33 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
         if (updatedShift && action.payload.paymentMethod === 'CASH') {
              updatedShift = {
                  ...updatedShift,
-                 totalSales: updatedShift.totalSales + action.payload.total
+                 totalSales: updatedShift.totalSales + action.payload.netTotal
              };
+        }
+
+        // Handle Customer Points (Deduct Redeemed, Add New Earned)
+        let updatedCustomers = state.customers;
+        if (action.payload.customerId) {
+            updatedCustomers = state.customers.map(c => {
+                if (c.id === action.payload.customerId) {
+                    const earnedPoints = Math.floor(action.payload.netTotal / 20); // Earn 1 point per 20 THB
+                    return {
+                        ...c,
+                        points: c.points - action.payload.pointsRedeemed + earnedPoints,
+                        totalSpent: c.totalSpent + action.payload.netTotal,
+                        lastVisit: new Date().toISOString().split('T')[0]
+                    };
+                }
+                return c;
+            });
         }
 
       return {
         ...state,
         sales: [action.payload, ...state.sales],
         stockLogs: [...newLogs, ...state.stockLogs],
-        activeShift: updatedShift
+        activeShift: updatedShift,
+        customers: updatedCustomers
       };
     case 'UPDATE_STOCK':
       return {
@@ -77,6 +95,7 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
         };
 
     case 'UPDATE_CUSTOMER_POINTS':
+      // This is now handled inside ADD_SALE to be atomic, but kept for direct updates if needed
       return {
         ...state,
         customers: state.customers.map(c =>
@@ -170,6 +189,24 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
     case 'UPDATE_SETTINGS':
         return { ...state, settings: action.payload };
 
+    case 'HOLD_BILL':
+        return {
+            ...state,
+            heldBills: [...state.heldBills, action.payload]
+        };
+
+    case 'RESUME_BILL':
+        return {
+            ...state,
+            heldBills: state.heldBills.filter(b => b.id !== action.payload)
+        };
+
+    case 'DELETE_HELD_BILL':
+        return {
+             ...state,
+             heldBills: state.heldBills.filter(b => b.id !== action.payload)
+        };
+
     default:
       return state;
   }
@@ -187,7 +224,8 @@ const initialState: GlobalState = {
   currentBranch: MOCK_BRANCHES[0],
   settings: MOCK_SETTINGS,
   activeShift: null,
-  shiftHistory: MOCK_SHIFTS
+  shiftHistory: MOCK_SHIFTS,
+  heldBills: []
 };
 
 const App: React.FC = () => {

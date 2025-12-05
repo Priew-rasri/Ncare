@@ -60,17 +60,28 @@ export interface CartItem extends Product {
   quantity: number;
 }
 
+export interface HeldBill {
+    id: string;
+    timestamp: string;
+    customer?: Customer;
+    items: CartItem[];
+    note?: string;
+}
+
 export interface SaleRecord {
   id: string;
   date: string;
   customerId?: string;
   items: CartItem[];
-  total: number;
+  total: number;       // Gross Total
+  discount: number;    // Discount Amount
+  pointsRedeemed: number;
+  netTotal: number;    // Final Payment Amount
   
-  // Tax Breakdown for Accounting
-  subtotalVatable: number; // Base amount for VAT items
-  subtotalExempt: number;  // Amount for Non-VAT items
-  vatAmount: number;       // The 7% amount
+  // Tax Breakdown for Accounting (Calculated from NetTotal)
+  subtotalVatable: number; 
+  subtotalExempt: number;  
+  vatAmount: number;       
   
   paymentMethod: 'CASH' | 'QR' | 'CREDIT';
   branchId: string;
@@ -157,6 +168,7 @@ export interface GlobalState {
   activeShift: Shift | null;
   shiftHistory: Shift[];
   settings: Settings;
+  heldBills: HeldBill[];
 }
 
 export type Action =
@@ -170,4 +182,7 @@ export type Action =
   | { type: 'SWITCH_BRANCH'; payload: string }
   | { type: 'OPEN_SHIFT'; payload: { staff: string; startCash: number } }
   | { type: 'CLOSE_SHIFT'; payload: { actualCash: number } }
-  | { type: 'UPDATE_SETTINGS'; payload: Settings };
+  | { type: 'UPDATE_SETTINGS'; payload: Settings }
+  | { type: 'HOLD_BILL'; payload: HeldBill }
+  | { type: 'RESUME_BILL'; payload: string } // billId
+  | { type: 'DELETE_HELD_BILL'; payload: string };
