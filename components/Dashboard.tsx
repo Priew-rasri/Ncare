@@ -1,5 +1,6 @@
 
 
+
 import React, { useMemo } from 'react';
 import { 
   BarChart, 
@@ -16,7 +17,7 @@ import {
   Cell
 } from 'recharts';
 import { GlobalState } from '../types';
-import { ArrowUpRight, ArrowDownRight, Users, DollarSign, PackageCheck, AlertTriangle, Filter, Clock, TrendingUp } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Users, DollarSign, PackageCheck, AlertTriangle, Filter, Clock, TrendingUp, MonitorPlay } from 'lucide-react';
 
 interface DashboardProps {
   data: GlobalState;
@@ -51,16 +52,8 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
 
     // Aggregate Sales
     data.sales.forEach(sale => {
-        // Parse "dd/mm/yyyy" or Date object
         let dateKey = '';
         try {
-            // Mock data format is likely locale string, let's just use random distribution for mock stability if date parsing fails
-            // In real app, strict date format is required.
-            // For now, let's rely on the mock data generation logic in constants.
-            // Simplification: We will just map the mock data loosely.
-            
-            // Assume mock data dates are recent.
-            // Extract day from sale.date string (e.g., "24/5/2567")
             const parts = sale.date.split(' ')[0].split('/');
             if(parts.length >= 2) {
                 dateKey = parts[0] + '/' + parts[1];
@@ -87,6 +80,13 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
                  .sort((a,b) => b.value - a.value)
                  .slice(0, 5);
   }, [data.sales]);
+
+  // 5. Mock Live Queue for "Ncare Service"
+  const queueList = [
+      { id: 'A052', status: 'COUNSELING', name: 'คุณสมชาย' },
+      { id: 'A053', status: 'WAITING', name: 'คุณหญิง' },
+      { id: 'A054', status: 'READY', name: 'คุณลุง' },
+  ];
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
@@ -144,7 +144,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
         <StatCard 
             title="Active Customers" 
             value={totalCustomers} 
-            subValue="Registered Members"
+            subValue="Ncare Members"
             icon={Users} 
             color="indigo" 
             trend={5.2} 
@@ -198,8 +198,38 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
           </div>
         </div>
 
-        {/* Right Column: Top Products & Expiry */}
+        {/* Right Column: Queue & Top Products */}
         <div className="space-y-6">
+             {/* Live Queue Widget (Ncare Exclusive) */}
+            <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-lg border border-slate-700 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-20">
+                    <MonitorPlay className="w-20 h-20" />
+                </div>
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                    <h3 className="font-bold text-lg">Live Queue</h3>
+                </div>
+                <div className="space-y-3 relative z-10">
+                    {queueList.map((q, i) => (
+                        <div key={i} className="flex justify-between items-center bg-white/10 p-3 rounded-xl border border-white/10">
+                            <div>
+                                <span className="text-xs text-slate-300 block">{q.name}</span>
+                                <span className="font-bold text-xl">{q.id}</span>
+                            </div>
+                            <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                                q.status === 'READY' ? 'bg-green-500 text-white' : 
+                                q.status === 'COUNSELING' ? 'bg-blue-500 text-white' : 'bg-orange-500 text-white'
+                            }`}>
+                                {q.status}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+                <div className="mt-4 text-center">
+                    <button className="text-xs font-bold text-slate-300 hover:text-white underline">Manage Queue</button>
+                </div>
+            </div>
+
             {/* Top Selling Products */}
             <div className="bg-white p-6 rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-slate-50">
                 <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
@@ -237,30 +267,6 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
                             <span className="font-bold text-slate-800">{p.value} units</span>
                         </div>
                     ))}
-                </div>
-            </div>
-
-            {/* Expiry Alert Widget (Critical for Pharmacy) */}
-            <div className="bg-red-50 p-6 rounded-3xl border border-red-100">
-                <div className="flex items-center gap-3 mb-3">
-                    <div className="bg-red-100 p-2 rounded-full">
-                        <Clock className="w-5 h-5 text-red-600" />
-                    </div>
-                    <div>
-                         <h3 className="font-bold text-red-900">Near Expiry Alert</h3>
-                         <p className="text-xs text-red-700">Action needed for {expiringSoonItems.length} items</p>
-                    </div>
-                </div>
-                <div className="space-y-2 mt-2">
-                    {expiringSoonItems.slice(0, 3).map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg shadow-sm border border-red-100/50">
-                            <span className="text-xs font-bold text-slate-700">{item.name}</span>
-                            <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded font-bold">Exp Soon</span>
-                        </div>
-                    ))}
-                    {expiringSoonItems.length === 0 && (
-                        <p className="text-xs text-green-700 italic">All items are fresh!</p>
-                    )}
                 </div>
             </div>
         </div>

@@ -1,5 +1,5 @@
 {
-  "name": " PharmaFlow ERP",
-  "description": "ระบบบริหารจัดการร้านยาครบวงจร (POS, Inventory, CRM, Accounting) พร้อมผู้ช่วย AI อัจฉริยะ",
+  "name": "Ncare ERP",
+  "description": "ระบบบริหารจัดการร้านยา Ncare (POS, Inventory, CRM, Accounting) พร้อมผู้ช่วย AI อัจฉริยะ",
   "requestFramePermissions": []
 }

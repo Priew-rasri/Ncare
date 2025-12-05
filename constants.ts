@@ -1,26 +1,27 @@
 
+
 import { Product, ProductCategory, Customer, PurchaseOrder, SaleRecord, Expense, Branch, Supplier, StockLog, Settings, Shift, User } from './types';
 
 export const MOCK_USERS: User[] = [
-    { id: 'U001', username: 'owner', name: 'Dr. Somchai (Owner)', role: 'OWNER' },
-    { id: 'U002', username: 'pharm', name: 'P. Jane (Pharmacist)', role: 'PHARMACIST' },
-    { id: 'U003', username: 'staff', name: 'Staff Boy', role: 'STAFF' },
+    { id: 'U001', username: 'owner', name: 'ภก. สมชาย (Owner)', role: 'OWNER' },
+    { id: 'U002', username: 'pharm', name: 'ภญ. เจนจิรา (Pharmacist)', role: 'PHARMACIST' },
+    { id: 'U003', username: 'staff', name: 'พนักงานขาย (Staff)', role: 'STAFF' },
 ];
 
 export const MOCK_BRANCHES: Branch[] = [
-    { id: 'B001', name: 'สาขาใหญ่ (Headquarters)', location: 'Siam Square', type: 'HQ' },
-    { id: 'B002', name: 'สาขาลาดพร้าว', location: 'Ladprao', type: 'BRANCH' },
-    { id: 'B003', name: 'สาขาบางนา', location: 'Bangna', type: 'BRANCH' },
+    { id: 'B001', name: 'Ncare HQ (สาขาใหญ่)', location: 'Siam Square', type: 'HQ' },
+    { id: 'B002', name: 'Ncare สาขาลาดพร้าว', location: 'Ladprao', type: 'BRANCH' },
+    { id: 'B003', name: 'Ncare สาขาบางนา', location: 'Bangna', type: 'BRANCH' },
 ];
 
 export const MOCK_SETTINGS: Settings = {
-    storeName: 'PharmaFlow Pharmacy',
-    taxId: '0105555123456',
-    address: '123 Rama I Rd, Pathum Wan, Bangkok 10330',
-    phone: '02-123-4567',
+    storeName: 'Ncare Pharmacy (ร้านยา เอ็นแคร์)',
+    taxId: '0105555888999',
+    address: '88/9 อาคารเอ็นแคร์ ชั้น 1 ถ.สุขุมวิท เขตคลองเตย กทม. 10110',
+    phone: '02-888-9999',
     vatRate: 7,
     printerIp: '192.168.1.200',
-    receiptFooter: 'Thank you for your trust. Please consult your pharmacist.'
+    receiptFooter: 'Ncare - We Care for Your Life. ปรึกษาเภสัชกรได้ตลอด 24 ชม.'
 };
 
 export const MOCK_SUPPLIERS: Supplier[] = [

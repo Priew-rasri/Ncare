@@ -1,8 +1,9 @@
 
+
 import React, { useState } from 'react';
 import { User } from '../types';
 import { MOCK_USERS } from '../constants';
-import { Activity, LogIn, ShieldCheck } from 'lucide-react';
+import { HeartPulse, LogIn, ShieldCheck } from 'lucide-react';
 
 interface LoginProps {
     onLogin: (user: User) => void;
@@ -38,14 +39,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
             <div className="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
-                <div className="bg-blue-600 p-8 text-center relative overflow-hidden">
+                <div className="bg-gradient-to-br from-blue-600 to-teal-600 p-8 text-center relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle,rgba(255,255,255,0.2)_0%,transparent_70%)]"></div>
                     <div className="relative z-10 flex flex-col items-center">
                         <div className="bg-white p-3 rounded-2xl shadow-lg mb-4 text-blue-600">
-                            <Activity className="w-8 h-8" />
+                            <HeartPulse className="w-8 h-8" />
                         </div>
-                        <h1 className="text-2xl font-bold text-white tracking-tight">Pharma<span className="text-blue-200">Flow</span> ERP</h1>
-                        <p className="text-blue-100 text-sm mt-1">Enterprise Management System</p>
+                        <h1 className="text-3xl font-bold text-white tracking-tight">Ncare<span className="text-teal-200">.</span></h1>
+                        <p className="text-blue-100 text-sm mt-1 font-medium">Professional Pharmacy ERP</p>
                     </div>
                 </div>
 
@@ -90,14 +91,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     <button 
                         type="submit" 
                         disabled={loading || !selectedUser || !password}
-                        className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="w-full py-4 bg-slate-900 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                        {loading ? 'Authenticating...' : <><LogIn className="w-5 h-5" /> Access System</>}
+                        {loading ? 'Authenticating...' : <><LogIn className="w-5 h-5" /> Login to Ncare</>}
                     </button>
                     
                     <p className="text-center text-[10px] text-slate-400">
-                        Restricted Access. Authorized Personnel Only.<br/>
-                        System v2.5.0 (Enterprise)
+                        Ncare System v3.0 (Enterprise)<br/>
+                        Authorized Personnel Only
                     </p>
                 </form>
             </div>

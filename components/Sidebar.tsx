@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { 
   LayoutDashboard, 
@@ -9,7 +10,8 @@ import {
   Settings, 
   Activity,
   Bot,
-  LogOut
+  LogOut,
+  HeartPulse
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -22,9 +24,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     { id: 'dashboard', label: 'Dashboard', thLabel: 'ภาพรวมธุรกิจ', icon: LayoutDashboard },
     { id: 'pos', label: 'Point of Sale', thLabel: 'ขายหน้าร้าน', icon: ShoppingCart },
     { id: 'inventory', label: 'Inventory', thLabel: 'คลังสินค้า', icon: Package },
-    { id: 'crm', label: 'Customers', thLabel: 'ลูกค้าสัมพันธ์', icon: Users },
+    { id: 'crm', label: 'Members', thLabel: 'สมาชิก Ncare', icon: Users },
     { id: 'accounting', label: 'Accounting', thLabel: 'บัญชีและการเงิน', icon: FileText },
-    { id: 'ai-assistant', label: 'AI Manager', thLabel: 'ผู้ช่วยอัจฉริยะ', icon: Bot, highlight: true },
+    { id: 'ai-assistant', label: 'Ncare Genius', thLabel: 'ผู้ช่วยอัจฉริยะ', icon: Bot, highlight: true },
     { id: 'settings', label: 'Settings', thLabel: 'ตั้งค่าระบบ', icon: Settings },
   ];
 
@@ -32,12 +34,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     <div className="w-72 bg-white text-slate-600 flex flex-col h-screen fixed left-0 top-0 shadow-[0_0_20px_rgba(0,0,0,0.03)] border-r border-slate-100 z-30">
       {/* Brand Header */}
       <div className="p-8 pb-6 flex items-center gap-3">
-        <div className="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-200 text-white">
-          <Activity className="w-7 h-7" />
+        <div className="bg-gradient-to-br from-blue-500 to-teal-500 p-2.5 rounded-xl shadow-lg shadow-blue-200 text-white">
+          <HeartPulse className="w-7 h-7" />
         </div>
         <div className="flex flex-col">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-800">Pharma<span className="text-blue-600">Flow</span></h1>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Enterprise ERP</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-800">Ncare<span className="text-teal-500">.</span></h1>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pharmacy System</p>
         </div>
       </div>
 
@@ -57,14 +59,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                 isActive 
                   ? 'bg-blue-50 text-blue-700' 
                   : 'hover:bg-slate-50 hover:text-slate-900'
-              } ${item.highlight ? 'mt-6 ring-1 ring-blue-100' : ''}`}
+              } ${item.highlight ? 'mt-6 ring-1 ring-teal-100 bg-teal-50/50' : ''}`}
             >
               {isActive && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-600 rounded-r-full"></div>
               )}
-              <item.icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'} ${item.highlight && !isActive ? 'text-blue-500' : ''}`} />
+              <item.icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'} ${item.highlight && !isActive ? 'text-teal-500' : ''}`} />
               <div className="flex flex-col items-start text-left">
-                  <span className={`font-bold text-sm leading-tight ${isActive ? 'text-blue-800' : ''}`}>{item.label}</span>
+                  <span className={`font-bold text-sm leading-tight ${isActive ? 'text-blue-800' : ''} ${item.highlight ? 'text-teal-700' : ''}`}>{item.label}</span>
                   <span className="text-[10px] opacity-70">{item.thLabel}</span>
               </div>
             </button>
@@ -80,7 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
             </div>
             <div className="overflow-hidden">
                 <p className="text-sm font-bold text-slate-800 truncate">Admin User</p>
-                <p className="text-xs text-slate-500">HQ Manager</p>
+                <p className="text-xs text-slate-500">Ncare HQ</p>
             </div>
         </div>
         <button className="flex items-center justify-center space-x-2 text-slate-500 hover:text-red-600 w-full py-2 text-xs font-bold transition-colors">

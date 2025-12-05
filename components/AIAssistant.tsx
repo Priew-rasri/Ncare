@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { GlobalState } from '../types';
 import { analyzeBusinessData } from '../services/geminiService';
@@ -16,7 +17,7 @@ interface Message {
 const AIAssistant: React.FC<AIAssistantProps> = ({ data }) => {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'ai', content: 'สวัสดีครับ ผมคือ **PharmaAI** ผู้ช่วยอัจฉริยะของคุณ มีอะไรให้ผมช่วยวิเคราะห์ข้อมูลร้านยาในวันนี้ไหมครับ? (เช่น วิเคราะห์ยอดขาย, แนะนำสินค้าที่ควรสั่งเพิ่ม)' }
+    { role: 'ai', content: 'สวัสดีครับ ผมคือ **Ncare Genius** ผู้ช่วยอัจฉริยะประจำร้านยาของคุณ มีอะไรให้ผมช่วยวิเคราะห์ข้อมูลวันนี้ไหมครับ? (เช่น วิเคราะห์ยอดขาย, แนะนำสินค้าขายดี)' }
   ]);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -48,7 +49,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ data }) => {
            <Bot className="w-6 h-6" />
         </div>
         <div>
-           <h2 className="font-bold text-lg">PharmaAI Assistant</h2>
+           <h2 className="font-bold text-lg">Ncare Genius AI</h2>
            <p className="text-xs text-teal-100 flex items-center gap-1"><Sparkles className="w-3 h-3"/> Powered by Gemini 2.5</p>
         </div>
       </div>
