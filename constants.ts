@@ -1,11 +1,21 @@
 
-import { Product, ProductCategory, Customer, PurchaseOrder, SaleRecord, Expense, Branch, Supplier, StockLog } from './types';
+import { Product, ProductCategory, Customer, PurchaseOrder, SaleRecord, Expense, Branch, Supplier, StockLog, Settings, Shift } from './types';
 
 export const MOCK_BRANCHES: Branch[] = [
     { id: 'B001', name: 'สาขาใหญ่ (Headquarters)', location: 'Siam Square', type: 'HQ' },
     { id: 'B002', name: 'สาขาลาดพร้าว', location: 'Ladprao', type: 'BRANCH' },
     { id: 'B003', name: 'สาขาบางนา', location: 'Bangna', type: 'BRANCH' },
 ];
+
+export const MOCK_SETTINGS: Settings = {
+    storeName: 'PharmaFlow Pharmacy',
+    taxId: '0105555123456',
+    address: '123 Rama I Rd, Pathum Wan, Bangkok 10330',
+    phone: '02-123-4567',
+    vatRate: 7,
+    printerIp: '192.168.1.200',
+    receiptFooter: 'Thank you for your trust. Please consult your pharmacist.'
+};
 
 export const MOCK_SUPPLIERS: Supplier[] = [
     { id: 'S001', name: 'บ. ยาไทย จำกัด (Thai Pharma)', contactPerson: 'คุณวิชัย', phone: '02-123-4567', email: 'sales@thaipharma.com', address: 'Bangkok', creditTerm: 30, rating: 4.5 },
@@ -28,6 +38,7 @@ export const MOCK_INVENTORY: Product[] = [
     minStock: 50,
     unit: 'แผง',
     requiresPrescription: false,
+    drugInteractions: ['Warfarin', 'Alcohol'],
     batches: [
         { lotNumber: 'L23001', expiryDate: '2025-12-31', quantity: 100, costPrice: 8 },
         { lotNumber: 'L22055', expiryDate: '2024-11-30', quantity: 20, costPrice: 7.5 },
@@ -47,6 +58,7 @@ export const MOCK_INVENTORY: Product[] = [
     minStock: 30,
     unit: 'แผง',
     requiresPrescription: true,
+    drugInteractions: ['Warfarin', 'Methotrexate'],
     batches: [
         { lotNumber: 'A9901', expiryDate: '2024-10-15', quantity: 45, costPrice: 45 }
     ]
@@ -101,6 +113,7 @@ export const MOCK_INVENTORY: Product[] = [
     minStock: 20,
     unit: 'ขวด',
     requiresPrescription: false,
+    drugInteractions: ['Paracetamol'], // Mock interaction for demo
     batches: [
         { lotNumber: 'ALC001', expiryDate: '2025-02-14', quantity: 8, costPrice: 30 }
     ]
@@ -175,3 +188,5 @@ export const MOCK_EXPENSES: Expense[] = [
     { id: 'EXP-002', title: 'ค่าไฟฟ้า', category: 'UTILITY', amount: 4500, date: '2024-05-05' },
     { id: 'EXP-003', title: 'เงินเดือนพนักงาน (part-time)', category: 'SALARY', amount: 8000, date: '2024-05-25' },
 ];
+
+export const MOCK_SHIFTS: Shift[] = [];

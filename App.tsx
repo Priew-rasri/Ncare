@@ -7,8 +7,9 @@ import Inventory from './components/Inventory';
 import CRM from './components/CRM';
 import Accounting from './components/Accounting';
 import AIAssistant from './components/AIAssistant';
-import { MOCK_INVENTORY, MOCK_CUSTOMERS, MOCK_SALES, MOCK_PO, MOCK_EXPENSES, MOCK_BRANCHES, MOCK_SUPPLIERS, MOCK_STOCK_LOGS } from './constants';
-import { GlobalState, Action, StockLog } from './types';
+import Settings from './components/Settings';
+import { MOCK_INVENTORY, MOCK_CUSTOMERS, MOCK_SALES, MOCK_PO, MOCK_EXPENSES, MOCK_BRANCHES, MOCK_SUPPLIERS, MOCK_STOCK_LOGS, MOCK_SETTINGS, MOCK_SHIFTS } from './constants';
+import { GlobalState, Action, StockLog, Shift } from './types';
 import { Search, Bell, MapPin, ChevronDown, Menu } from 'lucide-react';
 
 // Reducer
@@ -26,10 +27,20 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             staffName: 'Sales Staff'
         }));
 
+        // Update Shift Sales
+        let updatedShift = state.activeShift;
+        if (updatedShift && action.payload.paymentMethod === 'CASH') {
+             updatedShift = {
+                 ...updatedShift,
+                 totalSales: updatedShift.totalSales + action.payload.total
+             };
+        }
+
       return {
         ...state,
         sales: [action.payload, ...state.sales],
-        stockLogs: [...newLogs, ...state.stockLogs]
+        stockLogs: [...newLogs, ...state.stockLogs],
+        activeShift: updatedShift
       };
     case 'UPDATE_STOCK':
       return {
@@ -129,6 +140,36 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
     case 'SWITCH_BRANCH':
         const newBranch = state.branches.find(b => b.id === action.payload);
         return newBranch ? { ...state, currentBranch: newBranch } : state;
+        
+    case 'OPEN_SHIFT':
+        const newShift: Shift = {
+            id: `SHIFT-${Date.now()}`,
+            staffName: action.payload.staff,
+            startTime: new Date().toLocaleString(),
+            startCash: action.payload.startCash,
+            totalSales: 0,
+            status: 'OPEN'
+        };
+        return { ...state, activeShift: newShift };
+        
+    case 'CLOSE_SHIFT':
+        if (!state.activeShift) return state;
+        const closedShift: Shift = {
+            ...state.activeShift,
+            endTime: new Date().toLocaleString(),
+            status: 'CLOSED',
+            actualCash: action.payload.actualCash,
+            expectedCash: state.activeShift.startCash + state.activeShift.totalSales
+        };
+        return { 
+            ...state, 
+            activeShift: null, 
+            shiftHistory: [closedShift, ...state.shiftHistory] 
+        };
+        
+    case 'UPDATE_SETTINGS':
+        return { ...state, settings: action.payload };
+
     default:
       return state;
   }
@@ -143,7 +184,10 @@ const initialState: GlobalState = {
   stockLogs: MOCK_STOCK_LOGS,
   expenses: MOCK_EXPENSES,
   branches: MOCK_BRANCHES,
-  currentBranch: MOCK_BRANCHES[0]
+  currentBranch: MOCK_BRANCHES[0],
+  settings: MOCK_SETTINGS,
+  activeShift: null,
+  shiftHistory: MOCK_SHIFTS
 };
 
 const App: React.FC = () => {
@@ -164,6 +208,8 @@ const App: React.FC = () => {
         return <Accounting data={state} dispatch={dispatch} />;
       case 'ai-assistant':
         return <AIAssistant data={state} />;
+      case 'settings':
+        return <Settings data={state} dispatch={dispatch} />;
       default:
         return <Dashboard data={state} />;
     }

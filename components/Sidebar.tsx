@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
   LayoutDashboard, 
@@ -24,6 +25,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     { id: 'crm', label: 'Customers', thLabel: 'ลูกค้าสัมพันธ์', icon: Users },
     { id: 'accounting', label: 'Accounting', thLabel: 'บัญชีและการเงิน', icon: FileText },
     { id: 'ai-assistant', label: 'AI Manager', thLabel: 'ผู้ช่วยอัจฉริยะ', icon: Bot, highlight: true },
+    { id: 'settings', label: 'Settings', thLabel: 'ตั้งค่าระบบ', icon: Settings },
   ];
 
   return (

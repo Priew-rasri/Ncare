@@ -28,20 +28,21 @@ export interface StockLog {
 
 export interface Product {
   id: string;
-  barcode: string; // Critical for POS
+  barcode: string;
   name: string;
   genericName: string;
   category: ProductCategory;
   manufacturer: string;
-  location: string; // Warehouse Zone e.g., A1-02
+  location: string;
   price: number;
-  cost: number; // Moving Average Cost
-  stock: number; // Total stock
+  cost: number;
+  stock: number;
   minStock: number;
   unit: string;
   batches: Batch[];
   image?: string;
   requiresPrescription?: boolean;
+  drugInteractions?: string[]; // List of generic names this interacts with
 }
 
 export interface Customer {
@@ -66,6 +67,7 @@ export interface SaleRecord {
   total: number;
   paymentMethod: 'CASH' | 'QR' | 'CREDIT';
   branchId: string;
+  shiftId?: string;
 }
 
 export interface Supplier {
@@ -75,8 +77,8 @@ export interface Supplier {
   phone: string;
   email: string;
   address: string;
-  creditTerm: number; // Days
-  rating: number; // 1-5
+  creditTerm: number;
+  rating: number;
 }
 
 export interface POItem {
@@ -113,6 +115,28 @@ export interface Branch {
   type: 'HQ' | 'BRANCH';
 }
 
+export interface Shift {
+  id: string;
+  staffName: string;
+  startTime: string;
+  endTime?: string;
+  startCash: number;
+  expectedCash?: number; // System calced
+  actualCash?: number; // User counted
+  totalSales: number;
+  status: 'OPEN' | 'CLOSED';
+}
+
+export interface Settings {
+  storeName: string;
+  taxId: string;
+  address: string;
+  phone: string;
+  vatRate: number;
+  printerIp: string;
+  receiptFooter: string;
+}
+
 export interface GlobalState {
   inventory: Product[];
   customers: Customer[];
@@ -123,6 +147,9 @@ export interface GlobalState {
   expenses: Expense[];
   currentBranch: Branch;
   branches: Branch[];
+  activeShift: Shift | null;
+  shiftHistory: Shift[];
+  settings: Settings;
 }
 
 export type Action =
@@ -132,5 +159,8 @@ export type Action =
   | { type: 'UPDATE_CUSTOMER_POINTS'; payload: { customerId: string; points: number; spent: number } }
   | { type: 'ADD_PO'; payload: PurchaseOrder }
   | { type: 'RECEIVE_PO'; payload: { poId: string; receivedDate: string } }
-  | { type: 'ADJUST_STOCK'; payload: { productId: string; quantity: number; reason: string; staff: string } } // Warehouse Correction
-  | { type: 'SWITCH_BRANCH'; payload: string };
+  | { type: 'ADJUST_STOCK'; payload: { productId: string; quantity: number; reason: string; staff: string } }
+  | { type: 'SWITCH_BRANCH'; payload: string }
+  | { type: 'OPEN_SHIFT'; payload: { staff: string; startCash: number } }
+  | { type: 'CLOSE_SHIFT'; payload: { actualCash: number } }
+  | { type: 'UPDATE_SETTINGS'; payload: Settings };
