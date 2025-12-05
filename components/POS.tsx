@@ -891,13 +891,16 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                     autoFocus
                 />
             </div>
+            {/* Horizontal Scrollable Category Filter */}
             <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
                 {categories.map(cat => (
                     <button 
                         key={cat}
                         onClick={() => setActiveCategory(cat)}
-                        className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold transition-all ${
-                            activeCategory === cat ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold transition-all border ${
+                            activeCategory === cat 
+                            ? 'bg-blue-600 text-white shadow-md border-blue-600' 
+                            : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200'
                         }`}
                     >
                         {cat}
@@ -932,6 +935,9 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                         </div>
                         <div className="p-4 flex flex-col flex-1">
                             <h3 className="font-bold text-slate-800 text-sm line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors">{product.name}</h3>
+                            {product.subCategory && (
+                                <span className="text-[10px] text-slate-500 mt-1 block truncate">{product.subCategory}</span>
+                            )}
                             <div className="mt-auto flex justify-between items-end pt-2">
                                 <span className="font-bold text-lg text-blue-700">฿{product.price.toLocaleString()}</span>
                                 <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-blue-600"><Plus className="w-3 h-3"/></div>

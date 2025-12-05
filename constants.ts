@@ -35,7 +35,7 @@ export const MOCK_INVENTORY: Product[] = [
     barcode: '8850123456789',
     name: 'Sara (Paracetamol 500mg)',
     genericName: 'Paracetamol',
-    category: ProductCategory.HOUSEHOLD,
+    category: ProductCategory.PAIN_FEVER,
     manufacturer: 'Thai Nakorn Patana',
     location: 'A1-01',
     price: 15,
@@ -57,7 +57,8 @@ export const MOCK_INVENTORY: Product[] = [
     barcode: '8850987654321',
     name: 'Amoxy (Amoxicillin 500mg)',
     genericName: 'Amoxicillin',
-    category: ProductCategory.MEDICINE,
+    category: ProductCategory.ANTI_INFECTIVE,
+    subCategory: '6.1 แบคทีเรีย',
     manufacturer: 'Siam Pharma',
     location: 'B2-05',
     price: 80,
@@ -117,7 +118,7 @@ export const MOCK_INVENTORY: Product[] = [
     barcode: '8850888999000',
     name: 'Alcohol Gel 75%',
     genericName: 'Ethyl Alcohol',
-    category: ProductCategory.HOUSEHOLD,
+    category: ProductCategory.FIRST_AID,
     manufacturer: 'GPO',
     location: 'A2-03',
     price: 55,
@@ -137,7 +138,7 @@ export const MOCK_INVENTORY: Product[] = [
     barcode: '8850444333222',
     name: 'Ezerra Cream',
     genericName: 'Moisturizer',
-    category: ProductCategory.COSMETIC,
+    category: ProductCategory.SKIN,
     manufacturer: 'Hoe Pharma',
     location: 'C2-08',
     price: 750,
@@ -151,6 +152,47 @@ export const MOCK_INVENTORY: Product[] = [
     batches: [
         { lotNumber: 'CR009', expiryDate: '2025-08-10', quantity: 15, costPrice: 500 }
     ]
+  },
+  {
+      id: 'P007',
+      barcode: '8850999888777',
+      name: 'CPM (Chlorpheniramine 4mg)',
+      genericName: 'Chlorpheniramine',
+      category: ProductCategory.ALLERGY,
+      manufacturer: 'T.O. Pharma',
+      location: 'A1-05',
+      price: 20,
+      cost: 5,
+      stock: 200,
+      minStock: 50,
+      unit: 'แผง',
+      requiresPrescription: false,
+      isVatExempt: true,
+      defaultInstruction: 'รับประทานครั้งละ 1 เม็ด วันละ 3-4 ครั้ง',
+      batches: [
+          { lotNumber: 'CPM001', expiryDate: '2026-01-01', quantity: 200, costPrice: 5 }
+      ]
+  },
+  {
+      id: 'P008',
+      barcode: '8850777666555',
+      name: 'Amlodipine 5mg',
+      genericName: 'Amlodipine Besylate',
+      category: ProductCategory.CHRONIC,
+      subCategory: '15.1 หลอดเลือดและหัวใจ',
+      manufacturer: 'GPO',
+      location: 'B1-02',
+      price: 150,
+      cost: 80,
+      stock: 60,
+      minStock: 20,
+      unit: 'กล่อง',
+      requiresPrescription: true,
+      isVatExempt: true,
+      defaultInstruction: 'รับประทานครั้งละ 1 เม็ด วันละ 1 ครั้ง หลังอาหารเช้า',
+      batches: [
+          { lotNumber: 'AML99', expiryDate: '2025-05-05', quantity: 60, costPrice: 80 }
+      ]
   }
 ];
 

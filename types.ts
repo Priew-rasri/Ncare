@@ -1,10 +1,25 @@
 
 export enum ProductCategory {
-  MEDICINE = 'ยา',
-  SUPPLEMENT = 'อาหารเสริม',
-  EQUIPMENT = 'อุปกรณ์การแพทย์',
-  COSMETIC = 'เวชสำอาง',
-  HOUSEHOLD = 'ยาสามัญประจำบ้าน'
+  RESPIRATORY = '1.กลุ่มยาระบบทางเดินหายใจ',
+  ALLERGY = '2.กลุ่มยาโรคภูมิแพ้',
+  GASTRO = '3.กลุ่มยาระบบทางเดินอาหาร',
+  CNS = '4.กลุ่มยาระบบประสาทส่วนกลาง',
+  URO_GENITAL = '5.กลุ่มยาระบบทางเดินปัสสาวะและสืบพันธุ์',
+  ANTI_INFECTIVE = '6.กลุ่มยาฆ่าเชื้อ',
+  EYE_EAR_THROAT = '7.กลุ่มยา ตา หู และ คอ',
+  CONTRACEPTIVE = '8.ยาคุมกำเนิด และช่องคลอด',
+  PAIN_FEVER = '9.กลุ่มยาแก้ปวด ลดไข้',
+  MUSCLE_BONE = '10.กลุ่มยาระบบกล้ามเนื้อ และกระดูก',
+  ORAL_DENTAL = '11.กลุ่มยาช่องปาก และ ฟัน',
+  SKIN = '12.กลุ่มยาทาผิวหนัง',
+  BEAUTY = '13.กลุ่ม ผิว ผม เล็บ และความงาม',
+  KIDS_SYRUP = '14.กลุ่มยาน้ำเด็ก',
+  CHRONIC = '15.กลุ่มยาโรคเรื้อรัง',
+  SPECIAL_CONTROL = '16.ยาควบคุมพิเศษ',
+  HERBAL = '17.ยาแผนโบราณและสมุนไพร',
+  SUPPLEMENT = '18.ผลิตภัณฑ์อาหารเสริม และโภชนาการ',
+  EQUIPMENT = '19.อุปกรณ์การแพทย์',
+  FIRST_AID = '20.ปฐมพยาบาล'
 }
 
 export type UserRole = 'OWNER' | 'PHARMACIST' | 'STAFF';
@@ -52,6 +67,7 @@ export interface Product {
   name: string;
   genericName: string;
   category: ProductCategory;
+  subCategory?: string; // New field for 6.1, 6.2, 15.1 etc.
   manufacturer: string;
   location: string;
   price: number;

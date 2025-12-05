@@ -113,7 +113,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
               <tr>
                 <th className="px-6 py-4 font-bold tracking-wider w-12"></th>
                 <th className="px-6 py-4 font-bold tracking-wider">Product</th>
-                <th className="px-6 py-4 font-bold tracking-wider">Loc</th>
+                <th className="px-6 py-4 font-bold tracking-wider">Category</th>
                 <th className="px-6 py-4 font-bold tracking-wider text-right">Cost</th>
                 <th className="px-6 py-4 font-bold tracking-wider text-right">Price</th>
                 <th className="px-6 py-4 font-bold tracking-wider text-right">Stock</th>
@@ -130,7 +130,11 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                             <div className="text-xs text-slate-500">{item.genericName}</div>
                             <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-1"><Barcode className="w-3 h-3"/> {item.barcode}</div>
                         </td>
-                        <td className="px-6 py-4 text-slate-600 font-bold">{item.location}</td>
+                        <td className="px-6 py-4 text-slate-600 text-xs">
+                             <div className="font-bold text-slate-700">{item.category}</div>
+                             {item.subCategory && <div className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded inline-block mt-1 border border-blue-100">{item.subCategory}</div>}
+                             <div className="text-[10px] text-slate-400 mt-1">{item.location}</div>
+                        </td>
                         <td className="px-6 py-4 text-right text-slate-500">฿{item.cost}</td>
                         <td className="px-6 py-4 text-right font-bold text-blue-600">฿{item.price}</td>
                         <td className="px-6 py-4 text-right">
