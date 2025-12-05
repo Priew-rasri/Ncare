@@ -26,41 +26,42 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   ];
 
   return (
-    <div className="w-64 bg-slate-900 text-white flex flex-col h-screen fixed left-0 top-0 shadow-xl z-20">
-      <div className="p-6 flex items-center space-x-3 border-b border-slate-800">
-        <div className="bg-teal-500 p-2 rounded-lg">
+    <div className="w-64 bg-white text-slate-700 flex flex-col h-screen fixed left-0 top-0 shadow-[4px_0_24px_rgba(0,0,0,0.02)] border-r border-slate-100 z-20">
+      <div className="p-6 flex items-center space-x-3">
+        {/* Amway-like Logo Style: Clean, Bold Color */}
+        <div className="bg-gradient-to-br from-blue-600 to-blue-800 p-2.5 rounded-xl shadow-lg shadow-blue-200">
           <Activity className="text-white w-6 h-6" />
         </div>
         <div>
-          <h1 className="text-xl font-bold tracking-wide">PharmaFlow</h1>
-          <p className="text-xs text-slate-400">System v1.0.0</p>
+          <h1 className="text-xl font-bold tracking-tight text-slate-800">PharmaFlow</h1>
+          <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider">Enterprise ERP</p>
         </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+      <nav className="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto">
         {menuItems.map((item) => {
           const isActive = activeTab === item.id;
           return (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+              className={`w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl transition-all duration-300 group ${
                 isActive 
-                  ? 'bg-teal-600 text-white shadow-lg shadow-teal-900/20' 
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-              } ${item.highlight ? 'ring-1 ring-teal-500/50 mt-6' : ''}`}
+                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-200' 
+                  : 'text-slate-500 hover:bg-blue-50 hover:text-blue-700'
+              } ${item.highlight ? 'mt-6' : ''}`}
             >
-              <item.icon className={`w-5 h-5 ${item.highlight ? 'text-teal-400' : ''}`} />
-              <span className="font-medium">{item.label}</span>
+              <item.icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'} ${item.highlight && !isActive ? 'text-blue-500' : ''}`} />
+              <span className={`font-medium ${isActive ? 'font-semibold' : ''}`}>{item.label}</span>
             </button>
           );
         })}
       </nav>
 
-      <div className="p-4 border-t border-slate-800">
-        <button className="flex items-center space-x-3 text-slate-400 hover:text-white transition-colors w-full px-4 py-2">
+      <div className="p-4 border-t border-slate-50">
+        <button className="flex items-center space-x-3 text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-colors w-full px-4 py-3">
           <Settings className="w-5 h-5" />
-          <span>ตั้งค่าระบบ</span>
+          <span className="font-medium">ตั้งค่าระบบ</span>
         </button>
       </div>
     </div>
