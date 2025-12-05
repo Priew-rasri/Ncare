@@ -1,4 +1,5 @@
 
+
 import React, { useState, useReducer, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -10,7 +11,7 @@ import AIAssistant from './components/AIAssistant';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import { MOCK_INVENTORY, MOCK_SALES, MOCK_PO, MOCK_EXPENSES, MOCK_BRANCHES, MOCK_SUPPLIERS, MOCK_STOCK_LOGS, MOCK_SETTINGS, MOCK_SHIFTS } from './constants';
-import { GlobalState, Action, StockLog, Shift, Customer, SystemLog, TransferRequest, Notification } from './types';
+import { GlobalState, Action, StockLog, Shift, Customer, SystemLog, TransferRequest, Notification, SaleRecord } from './types';
 import { Search, Bell, MapPin, ChevronDown, Menu, AlertTriangle, Truck, Clock } from 'lucide-react';
 
 // Enhanced Mock Customers for CRM Demo
@@ -24,6 +25,22 @@ const MOCK_CUSTOMERS_ENHANCED: Customer[] = [
 const MOCK_TRANSFERS: TransferRequest[] = [
     { id: 'TR-001', date: '2024-05-20', fromBranchId: 'B001', toBranchId: 'B002', productId: 'P001', productName: 'Sara (Paracetamol)', quantity: 50, status: 'COMPLETED', requestedBy: 'Staff B' }
 ];
+
+// Helper to generate running numbers: INV-YYMM-XXXX
+const generateDocId = (prefix: string, sales: SaleRecord[]): string => {
+    const now = new Date();
+    const year = now.getFullYear().toString().substr(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const prefixDate = `${prefix}-${year}${month}-`;
+    
+    // Filter existing IDs for this month
+    const existingIds = sales
+        .filter(s => s.id.startsWith(prefixDate))
+        .map(s => parseInt(s.id.split('-')[2] || '0'));
+        
+    const nextSeq = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+    return `${prefixDate}${nextSeq.toString().padStart(4, '0')}`;
+};
 
 const reducer = (state: GlobalState, action: Action): GlobalState => {
   switch (action.type) {
@@ -57,9 +74,13 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
     case 'LOAD_STATE':
         return action.payload;
     case 'ADD_SALE':
+        // Generate proper Running Number
+        const newSaleId = generateDocId('INV', state.sales);
+        const saleRecord = { ...action.payload, id: newSaleId };
+
         // 1. FEFO Logic for Inventory Update
         const updatedInventoryFEFO = state.inventory.map(product => {
-            const saleItem = action.payload.items.find(i => i.id === product.id);
+            const saleItem = saleRecord.items.find(i => i.id === product.id);
             if (!saleItem) return product;
 
             let remainingQtyToDeduct = saleItem.quantity;
@@ -87,7 +108,7 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
         });
 
         // 2. Stock Logs
-        const newLogs: StockLog[] = action.payload.items.map(item => ({
+        const newLogs: StockLog[] = saleRecord.items.map(item => ({
             id: `LOG-${Date.now()}-${Math.random()}`,
             date: new Date().toLocaleString(),
             productId: item.id,
@@ -95,28 +116,28 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             action: 'SALE',
             quantity: -item.quantity,
             staffName: state.currentUser?.name || 'Unknown',
-            note: 'POS Sale'
+            note: `POS Sale: ${newSaleId}`
         }));
 
         // 3. Update Shift
         let updatedShift = state.activeShift;
-        if (updatedShift && action.payload.paymentMethod === 'CASH') {
+        if (updatedShift && saleRecord.paymentMethod === 'CASH') {
              updatedShift = {
                  ...updatedShift,
-                 totalSales: updatedShift.totalSales + action.payload.netTotal
+                 totalSales: updatedShift.totalSales + saleRecord.netTotal
              };
         }
 
         // 4. Update Customer Points
         let updatedCustomers = state.customers;
-        if (action.payload.customerId) {
+        if (saleRecord.customerId) {
             updatedCustomers = state.customers.map(c => {
-                if (c.id === action.payload.customerId) {
-                    const earnedPoints = Math.floor(action.payload.netTotal / 20);
+                if (c.id === saleRecord.customerId) {
+                    const earnedPoints = Math.floor(saleRecord.netTotal / 20);
                     return {
                         ...c,
-                        points: c.points - action.payload.pointsRedeemed + earnedPoints,
-                        totalSpent: c.totalSpent + action.payload.netTotal,
+                        points: c.points - saleRecord.pointsRedeemed + earnedPoints,
+                        totalSpent: c.totalSpent + saleRecord.netTotal,
                         lastVisit: new Date().toISOString().split('T')[0]
                     };
                 }
@@ -126,14 +147,88 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
 
       return {
         ...state,
-        sales: [action.payload, ...state.sales],
+        sales: [saleRecord, ...state.sales],
         inventory: updatedInventoryFEFO, // Use the FEFO updated inventory
         stockLogs: [...newLogs, ...state.stockLogs],
         activeShift: updatedShift,
         customers: updatedCustomers
       };
     
-    // Legacy update stock (kept for other manual adjustments if needed)
+    case 'VOID_SALE':
+        const { saleId, reason, user } = action.payload;
+        const saleToVoid = state.sales.find(s => s.id === saleId);
+        
+        if (!saleToVoid || saleToVoid.status === 'VOID') return state;
+
+        // 1. Mark Sale as Void
+        const updatedSales = state.sales.map(s => 
+            s.id === saleId ? { ...s, status: 'VOID' as const, voidReason: reason, voidBy: user } : s
+        );
+
+        // 2. Return Stock (Simple return to inventory, FEFO reverse is complex so we just add to stock)
+        // Ideally we should add to a specific batch, but here we'll add to the last batch or create a 'Return' batch
+        const restoredInventory = state.inventory.map(prod => {
+            const item = saleToVoid.items.find(i => i.id === prod.id);
+            if (!item) return prod;
+            
+            // Add quantity back to the last batch or a default one
+            const batches = [...prod.batches];
+            if (batches.length > 0) {
+                batches[batches.length - 1].quantity += item.quantity;
+            } else {
+                 // Create dummy batch if none exist
+                 batches.push({
+                     lotNumber: 'RETURNED',
+                     expiryDate: '2025-12-31',
+                     quantity: item.quantity,
+                     costPrice: prod.cost
+                 });
+            }
+
+            return {
+                ...prod,
+                stock: prod.stock + item.quantity,
+                batches: batches
+            };
+        });
+
+        // 3. Log Stock Return
+        const voidLogs: StockLog[] = saleToVoid.items.map(item => ({
+            id: `LOG-VOID-${Date.now()}-${Math.random()}`,
+            date: new Date().toLocaleString(),
+            productId: item.id,
+            productName: item.name,
+            action: 'VOID_RETURN',
+            quantity: item.quantity,
+            staffName: user,
+            note: `Void Bill: ${saleId} (${reason})`
+        }));
+
+        // 4. Deduct from Shift if CASH
+        let shiftAfterVoid = state.activeShift;
+        if (shiftAfterVoid && saleToVoid.paymentMethod === 'CASH') {
+            shiftAfterVoid = {
+                ...shiftAfterVoid,
+                totalSales: shiftAfterVoid.totalSales - saleToVoid.netTotal
+            };
+        }
+
+        return {
+            ...state,
+            sales: updatedSales,
+            inventory: restoredInventory,
+            stockLogs: [...voidLogs, ...state.stockLogs],
+            activeShift: shiftAfterVoid,
+            systemLogs: [{
+                id: `SYS-${Date.now()}`,
+                timestamp: new Date().toLocaleString(),
+                actor: user,
+                action: 'VOID_TRANSACTION',
+                details: `Voided Bill ${saleId}: ${reason}`,
+                severity: 'WARNING'
+            }, ...state.systemLogs]
+        };
+
     case 'UPDATE_STOCK':
       return {
         ...state,
@@ -243,7 +338,7 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
         
     case 'OPEN_SHIFT':
         const newShift: Shift = {
-            id: `SHIFT-${Date.now()}`,
+            id: `S-${new Date().toISOString().slice(0,10)}-${Date.now().toString().slice(-4)}`,
             staffName: action.payload.staff,
             startTime: new Date().toLocaleString(),
             startCash: action.payload.startCash,
@@ -335,7 +430,7 @@ const initialState: GlobalState = {
   currentUser: null,
   inventory: MOCK_INVENTORY,
   customers: MOCK_CUSTOMERS_ENHANCED,
-  sales: MOCK_SALES,
+  sales: MOCK_SALES, 
   purchaseOrders: MOCK_PO,
   suppliers: MOCK_SUPPLIERS,
   stockLogs: MOCK_STOCK_LOGS,
@@ -362,7 +457,6 @@ const App: React.FC = () => {
           try {
               const parsed = JSON.parse(savedState);
               // Ensure we don't load a logged-in user session by default for security
-              // Also ensure we have default transfers if missing from persistence
               const mergedState = { ...parsed, transfers: parsed.transfers || MOCK_TRANSFERS };
               dispatch({ type: 'LOAD_STATE', payload: { ...mergedState, currentUser: null, activeShift: parsed.activeShift } }); 
           } catch (e) {
@@ -465,7 +559,7 @@ const App: React.FC = () => {
             <div className="flex items-center gap-6">
                  <div className="hidden lg:flex items-center bg-slate-50 border border-slate-200 rounded-full px-4 py-2.5 w-64 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                     <Search className="w-4 h-4 text-slate-400 mr-2" />
-                    <input type="text" placeholder="Global Search..." className="bg-transparent border-none text-sm focus:outline-none w-full text-slate-700" />
+                    <input type="text" placeholder="Global Search (Ctrl+K)..." className="bg-transparent border-none text-sm focus:outline-none w-full text-slate-700" />
                  </div>
 
                  <div className="relative group hidden lg:block">

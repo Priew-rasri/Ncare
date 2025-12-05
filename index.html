@@ -10,10 +10,9 @@
     <style>
       body {
         font-family: 'Sarabun', sans-serif;
-        background-color: #f3f4f6; /* Light gray base like corporate apps */
+        background-color: #f3f4f6;
         color: #1e293b;
       }
-      /* Custom Scrollbar - Cleaner and thinner */
       ::-webkit-scrollbar {
         width: 6px;
         height: 6px;
@@ -38,15 +37,6 @@
         to { opacity: 1; transform: translateY(0); }
       }
 
-      /* Amway-like Button Gradients */
-      .btn-primary {
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
-      }
-      .btn-primary:hover {
-        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
-      }
-      
       .card-hover {
         transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
       }
@@ -55,40 +45,46 @@
         box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.1);
       }
 
-      /* PRINT STYLES for Thermal Printer (80mm Standard) */
+      /* PRINT STYLES */
       @media print {
-        @page {
-            margin: 0;
-            size: auto;
-        }
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: white;
-        }
-        body * {
-          visibility: hidden;
-        }
-        #printable-receipt, #printable-receipt * {
-          visibility: visible;
-        }
+        @page { margin: 0; size: auto; }
+        body { margin: 0; padding: 0; background-color: white; }
+        body * { visibility: hidden; }
+        
+        /* Receipt Printing */
+        #printable-receipt, #printable-receipt * { visibility: visible; }
         #printable-receipt {
           position: absolute;
           left: 0;
           top: 0;
-          width: 80mm; /* Standard Thermal Paper Width */
+          width: 80mm;
           padding: 5mm;
           background: white;
           color: black;
-          font-family: 'Courier New', Courier, monospace; /* Monospace for alignment */
+          font-family: 'Courier New', Courier, monospace;
           font-size: 12px;
           line-height: 1.2;
         }
-        .no-print {
-          display: none !important;
+
+        /* Shelf Tag Printing */
+        #printable-shelf-tag, #printable-shelf-tag * { visibility: visible; display: block !important; }
+        #printable-shelf-tag {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 60mm;
+            height: 40mm;
+            border: 1px dashed #000;
+            padding: 2mm;
+            text-align: center;
         }
+        .shelf-tag .price { font-size: 32px; font-weight: bold; margin-bottom: 5px; }
+        .shelf-tag .name { font-size: 14px; font-weight: bold; margin-bottom: 5px; line-height: 1.1; }
+        .shelf-tag .barcode-bars { font-family: 'Libre Barcode 39', cursive; font-size: 24px; }
+        .shelf-tag .code { font-size: 10px; }
+
+        .no-print { display: none !important; }
         
-        /* Receipt Specific Formatting */
         .receipt-header { text-align: center; margin-bottom: 10px; }
         .receipt-title { font-size: 16px; font-weight: bold; }
         .receipt-divider { border-bottom: 1px dashed #000; margin: 5px 0; }

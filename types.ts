@@ -29,7 +29,7 @@ export interface StockLog {
   date: string;
   productId: string;
   productName: string;
-  action: 'SALE' | 'RECEIVE' | 'ADJUST' | 'RETURN' | 'TRANSFER_IN' | 'TRANSFER_OUT';
+  action: 'SALE' | 'RECEIVE' | 'ADJUST' | 'RETURN' | 'TRANSFER_IN' | 'TRANSFER_OUT' | 'VOID_RETURN';
   quantity: number;
   staffName: string;
   note?: string;
@@ -93,7 +93,7 @@ export interface HeldBill {
 }
 
 export interface SaleRecord {
-  id: string;
+  id: string; // Format: INV-YYMM-XXXX
   date: string;
   customerId?: string;
   items: CartItem[];
@@ -110,6 +110,10 @@ export interface SaleRecord {
   branchId: string;
   shiftId?: string;
   prescriptionImage?: string; // Base64 or URL for GPP compliance
+  
+  status: 'COMPLETED' | 'VOID';
+  voidReason?: string;
+  voidBy?: string;
 }
 
 export interface Supplier {
@@ -223,6 +227,7 @@ export type Action =
   | { type: 'LOGOUT' }
   | { type: 'LOAD_STATE'; payload: GlobalState } // For persistence
   | { type: 'ADD_SALE'; payload: SaleRecord }
+  | { type: 'VOID_SALE'; payload: { saleId: string; reason: string; user: string } }
   | { type: 'UPDATE_STOCK'; payload: { productId: string; quantity: number; note: string } }
   | { type: 'ADD_CUSTOMER'; payload: Customer }
   | { type: 'UPDATE_CUSTOMER_POINTS'; payload: { customerId: string; points: number; spent: number } }

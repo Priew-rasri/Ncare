@@ -219,7 +219,8 @@ const generateMockSales = (): SaleRecord[] => {
                    { ...MOCK_INVENTORY[0], quantity: 2 },
                    { ...MOCK_INVENTORY[2], quantity: 1 }
                 ],
-                branchId: 'B001'
+                branchId: 'B001',
+                status: 'COMPLETED'
             });
         }
     }
