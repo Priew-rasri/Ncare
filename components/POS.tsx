@@ -156,6 +156,13 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   };
 
   const addToCart = (product: Product) => {
+    // 1. Stock Guard Validation
+    const existingQty = cart.find(x => x.id === product.id)?.quantity || 0;
+    if (existingQty + 1 > product.stock) {
+        alert(`❌ Insufficient Stock!\n\nProduct: ${product.name}\nAvailable: ${product.stock}\nIn Cart: ${existingQty}`);
+        return;
+    }
+
     const allergyWarning = getAllergyWarnings(product);
     if (allergyWarning) {
         if (!window.confirm(`⚠️ ALLERGY WARNING\n\nลูกค้ามีประวัติ ${allergyWarning}\n\nต้องการยืนยันการจ่ายยานี้หรือไม่?`)) return;
@@ -194,7 +201,15 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const updateQuantity = (id: string, delta: number) => {
     setCart(prev => prev.map(item => {
       if (item.id === id) {
-        const newQty = Math.max(1, item.quantity + delta);
+        const newQty = item.quantity + delta;
+        
+        // Stock Check for increment
+        if (delta > 0 && newQty > item.stock) {
+            alert(`Cannot exceed available stock (${item.stock})`);
+            return item;
+        }
+
+        if (newQty < 1) return item;
         return { ...item, quantity: newQty };
       }
       return item;
@@ -289,7 +304,6 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     };
 
     dispatch({ type: 'ADD_SALE', payload: sale });
-    // Note: Inventory deduction is now handled in ADD_SALE reducer for FEFO accuracy
     
     setLastSale(sale);
     setShowReceipt(true);
@@ -310,6 +324,23 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
           dispatch({ type: 'CLOSE_SHIFT', payload: { actualCash: closeShiftActual } });
           setShowCloseShiftModal(false);
       }
+  };
+
+  const calculateShiftTotals = () => {
+      if (!activeShift) return { cash: 0, qr: 0, credit: 0, total: 0 };
+      // Filter sales for current shift
+      const shiftSales = state.sales.filter(s => s.shiftId === activeShift.id);
+      
+      const cashSales = shiftSales.filter(s => s.paymentMethod === 'CASH').reduce((a,c) => a + c.netTotal, 0);
+      const qrSales = shiftSales.filter(s => s.paymentMethod === 'QR').reduce((a,c) => a + c.netTotal, 0);
+      const creditSales = shiftSales.filter(s => s.paymentMethod === 'CREDIT').reduce((a,c) => a + c.netTotal, 0);
+      
+      return {
+          cash: cashSales,
+          qr: qrSales,
+          credit: creditSales,
+          total: cashSales + qrSales + creditSales
+      };
   };
 
   const categories = ['ALL', ...Array.from(new Set(state.inventory.map(p => p.category)))];
@@ -344,6 +375,9 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
           </div>
       );
   }
+
+  // Shift Analysis for Modal
+  const shiftAnalysis = calculateShiftTotals();
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-9rem)] gap-6 animate-fade-in pb-2 relative">
@@ -464,18 +498,38 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                        <button onClick={() => setShowCloseShiftModal(false)}><X className="w-6 h-6 text-slate-400" /></button>
                    </div>
                    
-                   <div className="space-y-4 mb-6">
-                       <div className="flex justify-between p-3 bg-slate-50 rounded-lg">
-                           <span className="text-slate-500">Opening Cash</span>
+                   <div className="space-y-2 mb-6 text-sm">
+                       <div className="flex justify-between p-2 bg-slate-50 rounded">
+                           <span className="text-slate-500">Opening Cash (Float)</span>
                            <span className="font-bold text-slate-800">฿{activeShift.startCash.toLocaleString()}</span>
                        </div>
-                       <div className="flex justify-between p-3 bg-blue-50 rounded-lg">
-                           <span className="text-blue-600">Total Sales (Cash)</span>
-                           <span className="font-bold text-blue-800">฿{(activeShift.totalSales || 0).toLocaleString()}</span>
+                       
+                       <div className="border-t border-dashed border-slate-200 my-2"></div>
+                       
+                       <div className="flex justify-between p-1">
+                           <span className="text-slate-500">Sales (Cash)</span>
+                           <span className="font-bold text-slate-700">฿{shiftAnalysis.cash.toLocaleString()}</span>
                        </div>
-                       <div className="flex justify-between p-3 bg-slate-100 rounded-lg border border-slate-200">
-                           <span className="text-slate-700 font-bold">Expected Cash in Drawer</span>
-                           <span className="font-bold text-slate-900">฿{((activeShift.startCash) + (activeShift.totalSales || 0)).toLocaleString()}</span>
+                       <div className="flex justify-between p-1">
+                           <span className="text-slate-500">Sales (QR)</span>
+                           <span className="font-bold text-slate-700">฿{shiftAnalysis.qr.toLocaleString()}</span>
+                       </div>
+                       <div className="flex justify-between p-1">
+                           <span className="text-slate-500">Sales (Credit)</span>
+                           <span className="font-bold text-slate-700">฿{shiftAnalysis.credit.toLocaleString()}</span>
+                       </div>
+
+                       <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mt-2">
+                            <div className="flex justify-between items-center">
+                                <span className="text-blue-800 font-bold">Total Sales</span>
+                                <span className="text-blue-800 font-bold text-lg">฿{shiftAnalysis.total.toLocaleString()}</span>
+                            </div>
+                       </div>
+                       
+                       <div className="mt-4 p-3 bg-slate-100 rounded-lg border border-slate-200">
+                           <span className="block text-xs text-slate-500 uppercase mb-1">Expected Cash in Drawer</span>
+                           <span className="font-bold text-slate-900 text-xl block">฿{(activeShift.startCash + shiftAnalysis.cash).toLocaleString()}</span>
+                           <span className="text-[10px] text-slate-400">Float + Cash Sales</span>
                        </div>
                    </div>
 
@@ -488,8 +542,8 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                               className="w-full p-3 bg-white border border-slate-300 rounded-xl font-bold text-xl text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
                               autoFocus
                         />
-                        <div className={`mt-2 text-xs font-bold flex items-center gap-1 ${closeShiftActual - (activeShift.startCash + activeShift.totalSales) < 0 ? 'text-red-500' : 'text-green-500'}`}>
-                            Diff: ฿{(closeShiftActual - (activeShift.startCash + activeShift.totalSales)).toLocaleString()}
+                        <div className={`mt-2 text-xs font-bold flex items-center gap-1 ${closeShiftActual - (activeShift.startCash + shiftAnalysis.cash) !== 0 ? 'text-red-500' : 'text-green-500'}`}>
+                            Diff: ฿{(closeShiftActual - (activeShift.startCash + shiftAnalysis.cash)).toLocaleString()}
                         </div>
                    </div>
 
@@ -503,7 +557,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       {/* Receipt / Label Print Modal */}
       {showReceipt && lastSale && (
         <div id="receipt-modal" className="absolute inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-            <div id="printable-receipt" className={`bg-white w-full rounded-3xl shadow-2xl overflow-hidden animate-fade-in transition-all duration-300 ${showLabelPrint ? 'max-w-4xl' : 'max-w-sm'}`}>
+            <div id="printable-receipt-wrapper" className={`bg-white w-full rounded-3xl shadow-2xl overflow-hidden animate-fade-in transition-all duration-300 ${showLabelPrint ? 'max-w-4xl' : 'max-w-sm'}`}>
                 {showLabelPrint ? (
                     // Label Print View
                     <div className="flex flex-col h-[80vh]">
@@ -538,70 +592,86 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                          </div>
                     </div>
                 ) : (
-                    // Standard Receipt View
+                    // Standard Receipt View (Web Preview & 80mm Print Layout)
                     <>
-                        <div className="bg-blue-600 p-6 text-center text-white relative overflow-hidden no-print">
-                            <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle,white,transparent)]"></div>
-                            <CheckCircle className="w-16 h-16 mx-auto mb-3" />
-                            <h2 className="text-2xl font-bold">Payment Success</h2>
-                        </div>
-                        <div className="p-6">
-                            <div className="text-center mb-4">
-                                <h3 className="font-bold text-slate-800 text-xl">{state.settings.storeName}</h3>
-                                <p className="text-xs text-slate-500 mb-1">{state.settings.address}</p>
-                                <p className="text-xs text-slate-500">Tax ID: {state.settings.taxId} | Tel: {state.settings.phone}</p>
+                         {/* This div matches the specific thermal printer layout defined in index.html CSS */}
+                        <div id="printable-receipt">
+                            <div className="receipt-header">
+                                <div className="receipt-title">{state.settings.storeName}</div>
+                                <div>TAX ID: {state.settings.taxId}</div>
+                                <div>{state.settings.address}</div>
+                                <div>Tel: {state.settings.phone}</div>
                             </div>
-                            <div className="flex justify-between items-center text-sm text-slate-500 mb-4 pb-4 border-b border-dashed border-slate-200">
-                                <span>No: <span className="font-mono font-bold text-slate-800">{lastSale.id}</span></span>
+                            <div className="receipt-divider"></div>
+                            <div className="receipt-row">
+                                <span>Rect#: {lastSale.id.slice(-6)}</span>
                                 <span>{lastSale.date}</span>
                             </div>
-                            <div className="space-y-3 mb-6 max-h-none overflow-visible">
-                                {lastSale.items.map((item, idx) => (
-                                    <div key={idx} className="flex justify-between text-sm">
-                                        <span className="text-slate-600 w-2/3 truncate">
-                                            {item.quantity} x {item.name}
-                                        </span>
-                                        <span className="font-bold text-slate-800">฿{(item.price * item.quantity).toLocaleString()}</span>
-                                    </div>
-                                ))}
+                             <div className="receipt-row">
+                                <span>Staff: {state.currentUser?.name}</span>
                             </div>
-
-                            <div className="border-t border-dashed border-slate-200 pt-2 space-y-1">
-                                <div className="flex justify-between text-xs text-slate-500">
-                                    <span>Subtotal</span>
-                                    <span>฿{lastSale.total.toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between text-xs text-slate-500">
-                                    <span>VAT 7%</span>
-                                    <span>฿{lastSale.vatAmount.toLocaleString(undefined, {maximumFractionDigits:2})}</span>
-                                </div>
-                                {lastSale.discount > 0 && (
-                                     <div className="flex justify-between text-xs text-green-600 font-bold">
-                                        <span>Discount</span>
-                                        <span>-฿{lastSale.discount.toLocaleString()}</span>
+                            <div className="receipt-divider"></div>
+                            {lastSale.items.map((item, idx) => (
+                                <div key={idx} style={{marginBottom: '5px'}}>
+                                    <div className="receipt-row">
+                                        <span>{item.name}</span>
                                     </div>
-                                )}
+                                    <div className="receipt-row">
+                                        <span>{item.quantity} x {item.price.toFixed(2)}</span>
+                                        <span>{(item.quantity * item.price).toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            ))}
+                            <div className="receipt-divider"></div>
+                            <div className="receipt-row">
+                                <span>Subtotal</span>
+                                <span>{lastSale.total.toFixed(2)}</span>
                             </div>
+                             <div className="receipt-row">
+                                <span>Discount</span>
+                                <span>-{lastSale.discount.toFixed(2)}</span>
+                            </div>
+                            <div className="receipt-row receipt-total">
+                                <span>NET TOTAL</span>
+                                <span>{lastSale.netTotal.toFixed(2)}</span>
+                            </div>
+                            <div className="receipt-row">
+                                <span>VAT (Included)</span>
+                                <span>{lastSale.vatAmount.toFixed(2)}</span>
+                            </div>
+                            <div className="receipt-row">
+                                <span>Payment ({lastSale.paymentMethod})</span>
+                                <span>{lastSale.netTotal.toFixed(2)}</span>
+                            </div>
+                            <div className="receipt-footer">
+                                **********************************<br/>
+                                {state.settings.receiptFooter}<br/>
+                                Thank You<br/>
+                                **********************************
+                            </div>
+                        </div>
 
-                            <div className="flex justify-between items-center text-xl font-bold text-slate-900 pt-4 mt-2 border-t border-slate-900">
-                                <span>Net Total</span>
+                        {/* On-screen Preview UI (Hidden when printing) */}
+                        <div className="p-6 no-print">
+                             <div className="bg-blue-600 p-6 text-center text-white rounded-xl mb-4">
+                                <CheckCircle className="w-16 h-16 mx-auto mb-3" />
+                                <h2 className="text-2xl font-bold">Transaction Complete</h2>
+                                <p className="text-blue-100">Change: ฿0.00</p>
+                            </div>
+                            <div className="flex justify-between items-center text-xl font-bold text-slate-900 mb-6">
+                                <span>Total Paid</span>
                                 <span>฿{lastSale.netTotal.toLocaleString()}</span>
                             </div>
-
-                            <div className="mt-8 text-center text-[10px] text-slate-400">
-                                <p>Thank you for shopping with Ncare.</p>
-                                <p>{state.settings.receiptFooter}</p>
-                            </div>
                             
-                            <div className="grid grid-cols-2 gap-3 mt-6 no-print">
+                            <div className="grid grid-cols-2 gap-3 mt-6">
                                 <button onClick={() => setShowReceipt(false)} className="py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50">Close</button>
                                 <button onClick={() => setShowLabelPrint(true)} className="py-3 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 flex items-center justify-center gap-2">
                                      <Sticker className="w-4 h-4" /> Print Labels
                                 </button>
                             </div>
-                            <div className="mt-2 no-print">
+                            <div className="mt-2">
                                 <button onClick={() => window.print()} className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 flex items-center justify-center gap-2">
-                                     <Printer className="w-4 h-4" /> Print Receipt
+                                     <Printer className="w-4 h-4" /> Print Receipt (Thermal)
                                 </button>
                             </div>
                         </div>
@@ -663,12 +733,14 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                 const allergyWarning = getAllergyWarnings(product);
                 const interactionWarnings = getInteractionWarnings(product, cart);
                 const hasIssues = allergyWarning || interactionWarnings.length > 0;
+                const inCartQty = cart.find(c => c.id === product.id)?.quantity || 0;
+                const isOutOfStock = product.stock <= inCartQty;
 
                 return (
                     <div 
                         key={product.id} 
-                        onClick={() => product.stock > 0 && addToCart(product)}
-                        className={`bg-white rounded-xl shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer flex flex-col group overflow-hidden ${product.stock === 0 ? 'opacity-60 grayscale' : ''}`}
+                        onClick={() => !isOutOfStock && addToCart(product)}
+                        className={`bg-white rounded-xl shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer flex flex-col group overflow-hidden ${isOutOfStock ? 'opacity-60 grayscale cursor-not-allowed' : ''}`}
                     >
                         <div className="aspect-[4/3] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center relative p-6">
                             {product.image ? (
@@ -695,6 +767,11 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                                     Rx
                                 </div>
                             )}
+                            {isOutOfStock && (
+                                <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
+                                    <span className="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded shadow">OUT OF STOCK</span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="p-4 flex flex-col flex-1">
@@ -707,7 +784,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                                     <span className="block text-[10px] text-slate-400">Price</span>
                                     <span className="font-bold text-lg text-blue-700">฿{product.price.toLocaleString()}</span>
                                 </div>
-                                <button className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-blue-600 hover:bg-blue-600 hover:text-white transition-colors">
+                                <button disabled={isOutOfStock} className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isOutOfStock ? 'bg-slate-200 text-slate-400' : 'bg-slate-100 text-blue-600 hover:bg-blue-600 hover:text-white'}`}>
                                     <Plus className="w-4 h-4" />
                                 </button>
                             </div>
