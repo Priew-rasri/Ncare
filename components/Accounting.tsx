@@ -15,15 +15,27 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
     const [newPOSupplier, setNewPOSupplier] = useState('');
     const [previewReport, setPreviewReport] = useState<'TAX' | 'SALES' | null>(null);
 
+    // Accurate Financial Calculations
     const totalRevenue = data.sales.reduce((acc, curr) => acc + curr.total, 0);
     const totalExpenses = data.expenses.reduce((acc, curr) => acc + curr.amount, 0);
+    
+    // Calculate True COGS based on sold items' cost price
+    const totalCOGS = data.sales.reduce((acc, sale) => {
+        const saleCost = sale.items.reduce((itemAcc, item) => {
+            // Use the cost stored in the item at time of sale (from Product interface)
+            return itemAcc + (item.cost * item.quantity);
+        }, 0);
+        return acc + saleCost;
+    }, 0);
+
+    const netProfit = totalRevenue - totalCOGS - totalExpenses;
     
     const totalOutputVAT = data.sales.reduce((acc, curr) => acc + (curr.vatAmount || 0), 0);
     const totalVatableSales = data.sales.reduce((acc, curr) => acc + (curr.subtotalVatable || 0), 0);
     const totalExemptSales = data.sales.reduce((acc, curr) => acc + (curr.subtotalExempt || 0), 0);
-    
-    const totalCOGS = totalRevenue * 0.6; 
-    const netProfit = totalRevenue - totalCOGS - totalExpenses;
+
+    // Margin Calculation
+    const grossMarginPercent = totalRevenue > 0 ? ((totalRevenue - totalCOGS) / totalRevenue) * 100 : 0;
 
     const TabButton = ({ id, label }: { id: string, label: string }) => (
         <button 
@@ -45,7 +57,6 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
     };
 
     const handleSmartRestock = () => {
-        // Find items below minStock
         const lowStockItems = data.inventory.filter(p => p.stock <= p.minStock);
         if (lowStockItems.length === 0) {
             alert("No items are currently below minimum stock levels.");
@@ -54,7 +65,6 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
 
         if(!window.confirm(`Found ${lowStockItems.length} items with low stock. Generate Purchase Order?`)) return;
 
-        // Group by Supplier (Simplified logic: taking first supplier or random for demo)
         const supplier = data.suppliers[0]; 
         
         const newPO: PurchaseOrder = {
@@ -68,7 +78,7 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
             items: lowStockItems.map(p => ({
                 productId: p.id,
                 productName: p.name,
-                quantity: p.minStock * 2, // Reorder logic: 2x Min Stock
+                quantity: p.minStock * 2,
                 unitCost: p.cost
             })),
             totalAmount: lowStockItems.reduce((acc, p) => acc + (p.cost * p.minStock * 2), 0)
@@ -111,7 +121,10 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
                         </div>
                         Profit & Loss Statement
                     </h3>
-                    <button className="text-slate-400 hover:text-blue-600"><Printer className="w-5 h-5"/></button>
+                    <div className="text-right">
+                         <div className="text-xs font-bold text-slate-500 uppercase">Gross Margin</div>
+                         <div className="text-blue-600 font-bold">{grossMarginPercent.toFixed(1)}%</div>
+                    </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-8">

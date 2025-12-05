@@ -519,6 +519,44 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-9rem)] gap-6 animate-fade-in pb-2 relative">
       
+      {/* QR Payment Modal */}
+      {showQRModal && (
+        <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+             <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center">
+                 <div className="flex justify-between items-start mb-4">
+                     <div className="text-left">
+                         <h3 className="font-bold text-xl text-slate-800">PromptPay QR</h3>
+                         <p className="text-sm text-slate-500">Scan to pay</p>
+                     </div>
+                     <button onClick={() => setShowQRModal(false)}><X className="w-6 h-6 text-slate-400"/></button>
+                 </div>
+                 
+                 <div className="bg-blue-600 text-white p-4 rounded-t-2xl">
+                     <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/PromptPay-logo.png/640px-PromptPay-logo.png" className="h-8 mx-auto bg-white p-1 rounded" alt="PromptPay" />
+                 </div>
+                 <div className="bg-white border-x-2 border-b-2 border-blue-600 rounded-b-2xl p-6 mb-4 flex flex-col items-center">
+                     <div className="w-48 h-48 bg-slate-100 mb-4 relative">
+                         <QrCode className="w-full h-full text-slate-800" />
+                         <div className="absolute inset-0 flex items-center justify-center">
+                             <div className="bg-white p-1 rounded">
+                                 <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/PromptPay-logo.png/640px-PromptPay-logo.png" className="h-4" />
+                             </div>
+                         </div>
+                     </div>
+                     <div className="text-2xl font-bold text-blue-600">฿{qrAmount.toLocaleString()}</div>
+                     <p className="text-xs text-slate-400 mt-2">Ref: {Date.now().toString().slice(-8)}</p>
+                 </div>
+
+                 <button 
+                    onClick={() => completeCheckout('QR')}
+                    className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 transition-all"
+                 >
+                     Verify & Complete Payment
+                 </button>
+             </div>
+        </div>
+      )}
+
       {/* Instruction Editor Modal */}
       {editingInstructionId && (
           <div className="absolute inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -865,6 +903,11 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                     </div>
                  )}
                  <div className="receipt-footer">{state.settings.receiptFooter}</div>
+                 
+                 {/* Barcode for Easy Return */}
+                 <div className="receipt-barcode">
+                     <span>*{lastSale.id}*</span>
+                 </div>
              </div>
 
              {/* Hidden Print Area: Drug Labels (Stickers) */}

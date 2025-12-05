@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { GlobalState, TransferRequest, Product, ProductCategory } from '../types';
-import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight, TrendingUp, PieChart, Truck, ArrowLeftRight, Printer, Tag, FileText, AlertOctagon, Plus, Edit } from 'lucide-react';
+import { GlobalState, TransferRequest, Product, ProductCategory, Batch } from '../types';
+import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight, TrendingUp, PieChart, Truck, ArrowLeftRight, Printer, Tag, FileText, AlertOctagon, Plus, Edit, Trash2 } from 'lucide-react';
 
 interface InventoryProps {
   data: GlobalState;
@@ -23,6 +23,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productForm, setProductForm] = useState<Partial<Product>>({});
+  const [editableBatches, setEditableBatches] = useState<Batch[]>([]);
 
   // Shelf Tag Printing State
   const [showTagModal, setShowTagModal] = useState(false);
@@ -91,12 +92,14 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
           unit: 'ชิ้น',
           batches: []
       });
+      setEditableBatches([]);
       setShowProductModal(true);
   };
   
   const handleOpenEditProduct = (product: Product) => {
       setEditingProduct(product);
       setProductForm({ ...product });
+      setEditableBatches([...product.batches]);
       setShowProductModal(true);
   };
 
@@ -110,7 +113,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
           // Update
           dispatch({ 
               type: 'EDIT_PRODUCT', 
-              payload: { ...editingProduct, ...productForm } as Product 
+              payload: { ...editingProduct, ...productForm, batches: editableBatches } as Product 
           });
       } else {
           // Create
@@ -122,6 +125,12 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
           dispatch({ type: 'ADD_PRODUCT', payload: newProduct });
       }
       setShowProductModal(false);
+  };
+
+  const updateBatch = (index: number, field: keyof Batch, value: any) => {
+      const newBatches = [...editableBatches];
+      newBatches[index] = { ...newBatches[index], [field]: value };
+      setEditableBatches(newBatches);
   };
 
   const generateBarcode = () => {
@@ -615,6 +624,39 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                                <span className="text-sm font-medium text-red-600">Requires Prescription</span>
                            </label>
                       </div>
+
+                      {/* Batch Edit Section */}
+                      {editingProduct && (
+                          <div className="col-span-2 mt-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                              <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Manage Lots & Expiry (Admin Only)</h4>
+                              <div className="space-y-2">
+                                  {editableBatches.map((batch, idx) => (
+                                      <div key={idx} className="flex gap-2 items-center text-sm">
+                                          <input 
+                                              type="text" 
+                                              value={batch.lotNumber} 
+                                              onChange={(e) => updateBatch(idx, 'lotNumber', e.target.value)}
+                                              className="w-24 p-2 border rounded bg-white text-xs"
+                                          />
+                                          <input 
+                                              type="date" 
+                                              value={batch.expiryDate} 
+                                              onChange={(e) => updateBatch(idx, 'expiryDate', e.target.value)}
+                                              className={`p-2 border rounded bg-white text-xs ${new Date(batch.expiryDate) < new Date() ? 'text-red-500 font-bold' : ''}`}
+                                          />
+                                          <input 
+                                              type="number" 
+                                              value={batch.quantity} 
+                                              onChange={(e) => updateBatch(idx, 'quantity', Number(e.target.value))}
+                                              className="w-16 p-2 border rounded bg-white text-xs"
+                                          />
+                                          <span className="text-xs text-slate-400">Qty</span>
+                                      </div>
+                                  ))}
+                                  {editableBatches.length === 0 && <div className="text-xs text-slate-400 italic">No active batches</div>}
+                              </div>
+                          </div>
+                      )}
                   </div>
 
                   <div className="mt-8 flex gap-3">
@@ -713,7 +755,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                    <div className="shelf-tag">
                         <div className="price">฿{tagProduct.price}</div>
                         <div className="name">{tagProduct.name}</div>
-                        <div className="barcode-bars">|||| ||| || ||||</div>
+                        <div className="barcode-bars">{tagProduct.barcode}</div>
                         <div className="code">{tagProduct.barcode}</div>
                    </div>
               </div>
