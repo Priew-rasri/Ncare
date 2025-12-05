@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { GlobalState, Product, CartItem, SaleRecord, Shift, HeldBill } from '../types';
-import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan, Edit3, Sticker, UploadCloud, FileCheck, Camera, History, AlertTriangle, FileText, Briefcase, Coins, ArrowRightLeft, MousePointerClick, Tag } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan, Edit3, Sticker, UploadCloud, FileCheck, Camera, History, AlertTriangle, FileText, Briefcase, Coins, ArrowRightLeft, MousePointerClick, Tag, LogOut } from 'lucide-react';
 
 interface POSProps {
   state: GlobalState;
@@ -22,6 +22,8 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [openShiftAmount, setOpenShiftAmount] = useState<number>(1000);
   const [closeShiftActual, setCloseShiftActual] = useState<number>(0);
   const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
+  const [shiftSummary, setShiftSummary] = useState<Shift | null>(null);
+  
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastSale, setLastSale] = useState<SaleRecord | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
@@ -44,7 +46,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [tenderedAmount, setTenderedAmount] = useState('');
   const [showTaxInvoiceForm, setShowTaxInvoiceForm] = useState(false);
   const [taxDetails, setTaxDetails] = useState({ name: '', taxId: '', address: '' });
-  const [printMode, setPrintMode] = useState<'SLIP' | 'A4' | 'STICKER'>('SLIP');
+  const [printMode, setPrintMode] = useState<'SLIP' | 'A4' | 'STICKER' | 'Z_REPORT'>('SLIP');
 
   // Void Reason
   const [voidReason, setVoidReason] = useState('');
@@ -369,18 +371,36 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     setTaxDetails({ name: '', taxId: '', address: '' });
   };
 
-  useEffect(() => {
-      if (showReceipt && state.sales.length > 0) {
-          setLastSale(state.sales[0]);
-      }
-  }, [showReceipt, state.sales]);
+  const handleCloseShift = () => {
+      if (!activeShift) return;
+      dispatch({ type: 'CLOSE_SHIFT', payload: { actualCash: closeShiftActual } });
+      
+      // Calculate variance and details for the summary
+      const totalPayOut = activeShift.cashTransactions
+        .filter(t => t.type === 'PAY_OUT' || t.type === 'CASH_DROP')
+        .reduce((acc, curr) => acc + curr.amount, 0);
+      
+      const expectedCash = (activeShift.startCash + activeShift.totalCashSales) - totalPayOut;
 
-  const handlePrint = (mode: 'SLIP' | 'A4' | 'STICKER') => {
+      setShiftSummary({
+          ...activeShift,
+          actualCash: closeShiftActual,
+          expectedCash: expectedCash,
+          status: 'CLOSED',
+          endTime: new Date().toLocaleString()
+      });
+      
+      setShowCloseShiftModal(false);
+  };
+
+  const handlePrint = (mode: 'SLIP' | 'A4' | 'STICKER' | 'Z_REPORT') => {
       document.body.className = ''; // Reset classes
       if (mode === 'A4') {
           document.body.classList.add('print-a4');
       } else if (mode === 'STICKER') {
           document.body.classList.add('print-sticker');
+      } else if (mode === 'Z_REPORT') {
+          document.body.classList.add('print-z-report');
       } else {
           document.body.classList.add('print-slip');
       }
@@ -407,6 +427,66 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const categories = ['ALL', ...Array.from(new Set(state.inventory.map(p => p.category)))];
 
   if (!activeShift) {
+    if (shiftSummary) {
+        return (
+            <div className="h-[calc(100vh-8rem)] flex items-center justify-center animate-fade-in no-print">
+                <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full border border-slate-100 text-center">
+                    <div className="bg-green-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <CheckCircle className="w-10 h-10 text-green-600" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-800 mb-2">Shift Closed Successfully</h2>
+                    <p className="text-slate-500 mb-6">Staff: {shiftSummary.staffName}</p>
+                    
+                    <div className="bg-slate-50 p-4 rounded-xl text-left mb-6 space-y-2 text-sm">
+                        <div className="flex justify-between"><span>Expected Cash:</span><span className="font-bold">฿{shiftSummary.expectedCash?.toLocaleString()}</span></div>
+                        <div className="flex justify-between"><span>Actual Count:</span><span className="font-bold">฿{shiftSummary.actualCash?.toLocaleString()}</span></div>
+                        <div className="flex justify-between pt-2 border-t border-slate-200">
+                            <span>Variance:</span>
+                            <span className={`font-bold ${(shiftSummary.actualCash || 0) - (shiftSummary.expectedCash || 0) !== 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                ฿{((shiftSummary.actualCash || 0) - (shiftSummary.expectedCash || 0)).toLocaleString()}
+                            </span>
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={() => handlePrint('Z_REPORT')}
+                        className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl mb-3 flex items-center justify-center gap-2"
+                    >
+                        <Printer className="w-5 h-5" /> Print Z-Report
+                    </button>
+                    <button 
+                        onClick={() => setShiftSummary(null)} 
+                        className="w-full py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50"
+                    >
+                        Start New Shift
+                    </button>
+                </div>
+
+                {/* Hidden Printable Z-Report */}
+                <div id="printable-z-report" className="hidden">
+                    <div className="receipt-header">
+                        <div className="receipt-title">{state.settings.storeName}</div>
+                        <div>Z-REPORT (SHIFT CLOSING)</div>
+                    </div>
+                    <div className="receipt-divider"></div>
+                    <div className="receipt-row"><span>Shift ID:</span><span>{shiftSummary.id}</span></div>
+                    <div className="receipt-row"><span>Staff:</span><span>{shiftSummary.staffName}</span></div>
+                    <div className="receipt-row"><span>Open:</span><span>{shiftSummary.startTime}</span></div>
+                    <div className="receipt-row"><span>Close:</span><span>{shiftSummary.endTime}</span></div>
+                    <div className="receipt-divider"></div>
+                    <div className="receipt-row"><span>Opening Fund:</span><span>{shiftSummary.startCash.toFixed(2)}</span></div>
+                    <div className="receipt-row"><span>Cash Sales:</span><span>{shiftSummary.totalCashSales.toFixed(2)}</span></div>
+                    <div className="receipt-row"><span>QR Sales:</span><span>{shiftSummary.totalQrSales.toFixed(2)}</span></div>
+                    <div className="receipt-row"><span>Pay Outs:</span><span>-{(shiftSummary.startCash + shiftSummary.totalCashSales - (shiftSummary.expectedCash || 0)).toFixed(2)}</span></div>
+                    <div className="receipt-divider"></div>
+                    <div className="receipt-row" style={{fontWeight: 'bold'}}><span>Expected Cash:</span><span>{shiftSummary.expectedCash?.toFixed(2)}</span></div>
+                    <div className="receipt-row" style={{fontWeight: 'bold'}}><span>Actual Count:</span><span>{shiftSummary.actualCash?.toFixed(2)}</span></div>
+                    <div className="receipt-row"><span>Variance:</span><span>{((shiftSummary.actualCash || 0) - (shiftSummary.expectedCash || 0)).toFixed(2)}</span></div>
+                    <div className="receipt-footer">--- END OF REPORT ---</div>
+                </div>
+            </div>
+        );
+    }
       return (
           <div className="h-[calc(100vh-8rem)] flex items-center justify-center animate-fade-in">
               <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full border border-slate-100 text-center">
@@ -519,6 +599,46 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                       </div>
                       <button onClick={handleCashOps} className="w-full py-3 bg-slate-800 text-white font-bold rounded-xl mt-2">Confirm</button>
                   </div>
+              </div>
+          </div>
+      )}
+
+      {/* Close Shift Modal */}
+      {showCloseShiftModal && (
+          <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
+                   <div className="flex justify-between items-center mb-6">
+                      <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2"><LogOut className="w-5 h-5 text-red-600"/> End Shift Reconciliation</h3>
+                      <button onClick={() => setShowCloseShiftModal(false)}><X className="w-5 h-5"/></button>
+                   </div>
+                   
+                   <div className="bg-slate-50 p-4 rounded-xl mb-6 space-y-2 text-sm">
+                       <div className="flex justify-between text-slate-600"><span>Opening Fund</span><span>{activeShift.startCash.toLocaleString()}</span></div>
+                       <div className="flex justify-between text-slate-600"><span>Cash Sales</span><span>{activeShift.totalCashSales.toLocaleString()}</span></div>
+                       <div className="flex justify-between text-red-500"><span>Pay Outs</span><span>-{(activeShift.cashTransactions.reduce((a,c)=>a+c.amount,0)).toLocaleString()}</span></div>
+                       <div className="flex justify-between font-bold text-slate-800 border-t border-slate-200 pt-2">
+                           <span>Expected Cash in Drawer</span>
+                           <span>฿{((activeShift.startCash + activeShift.totalCashSales) - activeShift.cashTransactions.reduce((a,c)=>a+c.amount,0)).toLocaleString()}</span>
+                       </div>
+                   </div>
+
+                   <div className="mb-6">
+                       <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Actual Cash Count (นับจริง)</label>
+                       <input 
+                          type="number" 
+                          autoFocus
+                          className="w-full p-4 text-2xl font-bold border-2 border-slate-300 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 transition-all text-right"
+                          value={closeShiftActual}
+                          onChange={(e) => setCloseShiftActual(Number(e.target.value))}
+                       />
+                   </div>
+
+                   <button 
+                       onClick={handleCloseShift}
+                       className="w-full py-4 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transition-all"
+                   >
+                       Confirm Close & Print Z-Report
+                   </button>
               </div>
           </div>
       )}

@@ -66,6 +66,21 @@
           line-height: 1.2;
         }
 
+        /* Z-Report (Shift Closing) Printing */
+        .print-z-report #printable-z-report, .print-z-report #printable-z-report * { visibility: visible; }
+        .print-z-report #printable-z-report {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 80mm;
+          padding: 5mm;
+          background: white;
+          color: black;
+          font-family: 'Courier New', Courier, monospace;
+          font-size: 12px;
+          line-height: 1.2;
+        }
+
         /* Drug Label/Sticker Printing */
         .print-sticker #printable-stickers, .print-sticker #printable-stickers * { visibility: visible; }
         .print-sticker #printable-stickers {

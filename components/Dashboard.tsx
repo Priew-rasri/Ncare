@@ -105,6 +105,29 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
         }));
   }, [data.sales]);
 
+  // 7. Peak Hour Analysis
+  const peakHourData = useMemo(() => {
+      const hoursMap = new Array(24).fill(0);
+      data.sales.forEach(sale => {
+          try {
+             // sale.date format "DD/MM/YYYY HH:mm:ss"
+             const timePart = sale.date.split(' ')[1];
+             if(timePart) {
+                 const hour = parseInt(timePart.split(':')[0]);
+                 if(!isNaN(hour)) {
+                     hoursMap[hour]++;
+                 }
+             }
+          } catch(e) {}
+      });
+      
+      // Filter only business hours usually 8-22
+      return hoursMap.map((count, hour) => ({ 
+          name: `${hour}:00`, 
+          visitors: count 
+      })).slice(8, 22);
+  }, [data.sales]);
+
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
   const StatCard = ({ title, value, subValue, icon: Icon, color, trend }: any) => (
@@ -315,18 +338,23 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
                </div>
           </div>
           
-           <div className="bg-white p-6 rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-slate-50 flex items-center justify-center">
+           <div className="bg-white p-6 rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-slate-50 flex flex-col justify-center">
                <div className="text-center">
                    <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
                        <Clock className="w-8 h-8 text-blue-500" />
                    </div>
                    <h3 className="font-bold text-slate-800 text-lg">Peak Hour Analysis</h3>
-                   <p className="text-slate-500 text-sm mt-2 max-w-xs mx-auto">
-                       Advanced hourly traffic analysis is gathering data. Please wait for more transactions.
-                   </p>
-                   <button className="mt-4 px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200">
-                       Configure Shift Hours
-                   </button>
+                   <p className="text-slate-500 text-xs mb-4">Customer Traffic Heatmap (Based on Transactions)</p>
+               </div>
+               <div className="h-[150px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={peakHourData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" tick={{fontSize: 10}} />
+                            <Tooltip />
+                            <Bar dataKey="visitors" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
                </div>
            </div>
       </div>
