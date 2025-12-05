@@ -183,12 +183,32 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
         return;
     }
 
+    // 1. Check Customer Allergies
     if (selectedCustomer) {
         const allergy = selectedCustomer.allergies?.find(a => 
             product.genericName.toLowerCase().includes(a.toLowerCase()) || 
             (product.genericName === 'Amoxicillin' && a === 'Penicillin')
         );
-        if (allergy && !window.confirm(`⚠️ ALLERGY WARNING: ${allergy}\nConfirm sale?`)) return;
+        if (allergy && !window.confirm(`⚠️ ALLERGY WARNING: Customer is allergic to ${allergy}!\n\nAre you sure you want to add this item?`)) return;
+    }
+
+    // 2. Check Drug-Drug Interactions (Cart Items vs New Product)
+    const interactingItem = cart.find(cartItem => {
+        // Check if new product interacts with existing item
+        const conflictA = product.drugInteractions?.some(interaction => 
+            cartItem.genericName.toLowerCase().includes(interaction.toLowerCase())
+        );
+        // Check if existing item interacts with new product
+        const conflictB = cartItem.drugInteractions?.some(interaction => 
+            product.genericName.toLowerCase().includes(interaction.toLowerCase())
+        );
+        return conflictA || conflictB;
+    });
+
+    if (interactingItem) {
+        if (!window.confirm(`⚠️ DRUG INTERACTION ALERT!\n\n'${product.name}' may interact with '${interactingItem.name}' already in cart.\n\nDo you want to proceed?`)) {
+            return;
+        }
     }
 
     if (product.requiresPrescription && !needsPrescription) {
