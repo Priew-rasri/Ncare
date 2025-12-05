@@ -131,5 +131,6 @@ export type Action =
   | { type: 'ADD_CUSTOMER'; payload: Customer }
   | { type: 'UPDATE_CUSTOMER_POINTS'; payload: { customerId: string; points: number; spent: number } }
   | { type: 'ADD_PO'; payload: PurchaseOrder }
-  | { type: 'RECEIVE_PO'; payload: { poId: string; receivedDate: string } } // ERP Key Feature
+  | { type: 'RECEIVE_PO'; payload: { poId: string; receivedDate: string } }
+  | { type: 'ADJUST_STOCK'; payload: { productId: string; quantity: number; reason: string; staff: string } } // Warehouse Correction
   | { type: 'SWITCH_BRANCH'; payload: string };

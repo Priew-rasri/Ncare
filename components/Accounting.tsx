@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { GlobalState } from '../types';
-import { FileText, CheckCircle, Clock, XCircle, TrendingUp, TrendingDown, DollarSign, Calendar, AlertCircle, Printer, Users, Truck, Phone, Box } from 'lucide-react';
+import { GlobalState, PurchaseOrder } from '../types';
+import { FileText, CheckCircle, Clock, XCircle, TrendingUp, TrendingDown, DollarSign, Calendar, AlertCircle, Printer, Users, Truck, Phone, Box, Plus, X, ShoppingCart } from 'lucide-react';
 
 interface AccountingProps {
     data: GlobalState;
@@ -10,7 +10,12 @@ interface AccountingProps {
 
 const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'PO' | 'SUPPLIER' | 'EXPENSE'>('OVERVIEW');
-
+    const [showPOModal, setShowPOModal] = useState(false);
+    
+    // New PO Form State
+    const [newPOSupplier, setNewPOSupplier] = useState('');
+    const [newPOItems, setNewPOItems] = useState<{pid: string, qty: number}[]>([]);
+    
     const totalRevenue = data.sales.reduce((acc, curr) => acc + curr.total, 0);
     const totalExpenses = data.expenses.reduce((acc, curr) => acc + curr.amount, 0);
     const totalCOGS = totalRevenue * 0.6; // Estimated COGS
@@ -33,6 +38,33 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
         if (window.confirm("ยืนยันการรับสินค้าเข้าคลัง? \nระบบจะสร้าง Lot ใหม่และเพิ่มจำนวนสินค้าใน Inventory ทันที")) {
             dispatch({ type: 'RECEIVE_PO', payload: { poId, receivedDate: new Date().toISOString() } });
         }
+    };
+
+    const handleCreatePO = () => {
+        if(!newPOSupplier) return;
+        
+        // Mocking item selection for this demo, in real app would be a dynamic list
+        // Let's assume we buy P001 and P002 for simplicity or random items
+        const supplierObj = data.suppliers.find(s => s.id === newPOSupplier);
+        
+        const newPO: PurchaseOrder = {
+            id: `PO-${Date.now().toString().substr(-6)}`,
+            supplierId: newPOSupplier,
+            supplierName: supplierObj?.name || 'Unknown',
+            date: new Date().toLocaleDateString('en-CA'),
+            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA'),
+            status: 'PENDING',
+            paymentStatus: 'UNPAID',
+            items: [
+                { productId: 'P001', productName: 'Sara (Paracetamol)', quantity: 500, unitCost: 7.5 },
+                { productId: 'P004', productName: 'N-95 Mask', quantity: 100, unitCost: 10 }
+            ],
+            totalAmount: (500*7.5) + (100*10)
+        };
+
+        dispatch({ type: 'ADD_PO', payload: newPO });
+        setShowPOModal(false);
+        setNewPOSupplier('');
     };
 
     const renderOverview = () => (
@@ -113,6 +145,12 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
 
     const renderPO = () => (
          <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 overflow-hidden animate-fade-in">
+             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                 <h3 className="font-bold text-slate-800 text-lg">Purchase Orders</h3>
+                 <button onClick={() => setShowPOModal(true)} className="bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 px-5 py-2.5 rounded-full transition-colors shadow-lg shadow-blue-200 flex items-center gap-2">
+                    <Plus className="w-4 h-4" /> Create PO
+                 </button>
+             </div>
              <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                     <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase text-slate-500">
@@ -190,15 +228,10 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
                 </div>
             ))}
              <div className="bg-slate-50 p-6 rounded-2xl border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:bg-slate-100 hover:border-slate-400 transition-all h-full min-h-[200px]">
-                <PlusIcon className="w-10 h-10 mb-2 opacity-50" />
+                <Plus className="w-10 h-10 mb-2 opacity-50" />
                 <span className="font-bold text-sm">Add New Supplier</span>
             </div>
         </div>
-    );
-    
-    // Helper Icon
-    const PlusIcon = ({className}:{className?:string}) => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
     );
 
     const renderExpense = () => (
@@ -233,7 +266,63 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
     );
 
     return (
-        <div className="space-y-8 animate-fade-in pb-10">
+        <div className="space-y-8 animate-fade-in pb-10 relative">
+            {/* Create PO Modal */}
+            {showPOModal && (
+                <div className="absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 fixed top-0 left-72 w-[calc(100vw-18rem)] h-screen">
+                    <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl p-8 animate-fade-in border border-slate-100">
+                         <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                <ShoppingCart className="w-6 h-6 text-blue-600" /> Create Purchase Order
+                            </h3>
+                            <button onClick={() => setShowPOModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6"/></button>
+                        </div>
+                        
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-600 mb-2">Select Supplier</label>
+                                    <select 
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                                        value={newPOSupplier}
+                                        onChange={(e) => setNewPOSupplier(e.target.value)}
+                                    >
+                                        <option value="">-- Choose Supplier --</option>
+                                        {data.suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-600 mb-2">Expected Delivery</label>
+                                    <input type="date" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
+                                </div>
+                            </div>
+                            
+                            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                <h4 className="text-sm font-bold text-slate-700 mb-3">Order Items (Simulation)</h4>
+                                <div className="space-y-2 text-sm text-slate-600">
+                                    <div className="flex justify-between bg-white p-2 rounded border border-slate-100">
+                                        <span>Sara (Paracetamol) x 500 pack</span>
+                                        <span>฿3,750</span>
+                                    </div>
+                                    <div className="flex justify-between bg-white p-2 rounded border border-slate-100">
+                                        <span>N-95 Mask x 100 pcs</span>
+                                        <span>฿1,000</span>
+                                    </div>
+                                    <div className="flex justify-between pt-2 font-bold text-slate-900 border-t border-slate-200 mt-2">
+                                        <span>Total Amount</span>
+                                        <span>฿4,750</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button onClick={handleCreatePO} className="w-full py-4 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 shadow-lg flex items-center justify-center gap-2">
+                                Submit Order
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                      <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Financial Hub</h2>

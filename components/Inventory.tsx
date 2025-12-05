@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { GlobalState } from '../types';
-import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode } from 'lucide-react';
+import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X } from 'lucide-react';
 
 interface InventoryProps {
   data: GlobalState;
@@ -10,11 +10,32 @@ interface InventoryProps {
 
 const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
   const [activeTab, setActiveTab] = useState<'STOCK' | 'MOVEMENT'>('STOCK');
-  const [filter, setFilter] = useState('ALL');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  
+  // Adjustment Modal State
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustProductId, setAdjustProductId] = useState('');
+  const [adjustQty, setAdjustQty] = useState(0);
+  const [adjustReason, setAdjustReason] = useState('Damaged Stock');
 
   const toggleRow = (id: string) => {
     setExpandedRow(expandedRow === id ? null : id);
+  };
+
+  const handleAdjustStock = () => {
+    if (!adjustProductId || adjustQty === 0) return;
+    dispatch({
+        type: 'ADJUST_STOCK',
+        payload: {
+            productId: adjustProductId,
+            quantity: adjustQty,
+            reason: adjustReason,
+            staff: 'Warehouse Manager'
+        }
+    });
+    setShowAdjustModal(false);
+    setAdjustProductId('');
+    setAdjustQty(0);
   };
 
   const getStatusBadge = (stock: number, min: number) => {
@@ -32,11 +53,11 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
              <input type="text" placeholder="Search product name, lot number..." className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700" />
           </div>
           <div className="flex gap-2">
-             <button className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100">
-                <Filter className="w-4 h-4" /> Filter
+             <button onClick={() => setShowAdjustModal(true)} className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-900 rounded-lg text-sm font-bold text-white hover:bg-slate-800 shadow-md">
+                <Settings className="w-4 h-4" /> Stock Adjustment
              </button>
              <button className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100">
-                <RefreshCw className="w-4 h-4" /> Refresh
+                <Download className="w-4 h-4" /> Export
              </button>
           </div>
         </div>
@@ -88,7 +109,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                         {getStatusBadge(item.stock, item.minStock)}
                     </td>
                     <td className="px-6 py-4 text-center">
-                        <button className="text-blue-600 hover:text-blue-800 font-bold text-xs">Edit</button>
+                        <button className="text-blue-600 hover:text-blue-800 font-bold text-xs" onClick={(e) => { e.stopPropagation(); setAdjustProductId(item.id); setShowAdjustModal(true); }}>Adjust</button>
                     </td>
                     </tr>
                     
@@ -170,12 +191,13 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                             <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${
                                 log.action === 'SALE' ? 'bg-red-50 text-red-600' :
                                 log.action === 'RECEIVE' ? 'bg-green-50 text-green-600' :
+                                log.action === 'ADJUST' ? 'bg-orange-50 text-orange-600' :
                                 'bg-slate-100 text-slate-600'
                             }`}>
                                 {log.action}
                             </span>
                         </td>
-                        <td className={`px-6 py-4 text-right font-bold ${log.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <td className={`px-6 py-4 text-right font-bold ${log.quantity > 0 ? 'text-green-600' : log.quantity < 0 ? 'text-red-600' : 'text-slate-600'}`}>
                             {log.quantity > 0 ? '+' : ''}{log.quantity}
                         </td>
                         <td className="px-6 py-4 text-slate-600 text-xs">{log.staffName}</td>
@@ -188,7 +210,76 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
   );
 
   return (
-    <div className="space-y-6 animate-fade-in pb-10">
+    <div className="space-y-6 animate-fade-in pb-10 relative">
+      {/* Stock Adjustment Modal */}
+      {showAdjustModal && (
+        <div className="absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 h-[calc(100vh-100px)] fixed top-0 left-72 w-[calc(100vw-18rem)]">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 animate-fade-in border border-slate-100">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <Settings className="w-5 h-5 text-slate-500" /> Stock Adjustment
+                    </h3>
+                    <button onClick={() => setShowAdjustModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+                </div>
+                
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Product</label>
+                        <select 
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                            value={adjustProductId}
+                            onChange={(e) => setAdjustProductId(e.target.value)}
+                        >
+                            <option value="">-- Select Product to Adjust --</option>
+                            {data.inventory.map(p => (
+                                <option key={p.id} value={p.id}>{p.name} (Curr: {p.stock})</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-600 mb-1">Adjustment Qty (+/-)</label>
+                            <input 
+                                type="number" 
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                                placeholder="-5 or 10"
+                                value={adjustQty}
+                                onChange={(e) => setAdjustQty(Number(e.target.value))}
+                            />
+                        </div>
+                         <div>
+                            <label className="block text-xs font-bold text-slate-600 mb-1">Reason</label>
+                            <select 
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                                value={adjustReason}
+                                onChange={(e) => setAdjustReason(e.target.value)}
+                            >
+                                <option value="Damaged Stock">Damaged Stock</option>
+                                <option value="Expired">Expired</option>
+                                <option value="Inventory Count">Inventory Count Correction</option>
+                                <option value="Internal Use">Internal Use</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div className="bg-blue-50 p-3 rounded-lg flex gap-2 items-start mt-2">
+                        <AlertTriangle className="w-4 h-4 text-blue-600 mt-0.5" />
+                        <p className="text-xs text-blue-700 leading-relaxed">
+                            This action will immediately affect the inventory count and create an audit log entry.
+                        </p>
+                    </div>
+
+                    <div className="flex gap-3 mt-6">
+                        <button onClick={() => setShowAdjustModal(false)} className="flex-1 py-3 text-slate-600 font-bold text-sm hover:bg-slate-50 rounded-xl border border-transparent">Cancel</button>
+                        <button onClick={handleAdjustStock} className="flex-1 py-3 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 shadow-lg flex items-center justify-center gap-2">
+                            <Save className="w-4 h-4" /> Confirm Adjustment
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
             <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Warehouse & Inventory</h2>

@@ -40,6 +40,31 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             : p
         )
       };
+    case 'ADJUST_STOCK':
+        const adjustProduct = state.inventory.find(p => p.id === action.payload.productId);
+        if (!adjustProduct) return state;
+
+        const adjustmentLog: StockLog = {
+            id: `LOG-ADJ-${Date.now()}`,
+            date: new Date().toLocaleString(),
+            productId: action.payload.productId,
+            productName: adjustProduct.name,
+            action: 'ADJUST',
+            quantity: action.payload.quantity,
+            staffName: action.payload.staff,
+            note: action.payload.reason
+        };
+
+        return {
+            ...state,
+            inventory: state.inventory.map(p => 
+                p.id === action.payload.productId
+                ? { ...p, stock: p.stock + action.payload.quantity }
+                : p
+            ),
+            stockLogs: [adjustmentLog, ...state.stockLogs]
+        };
+
     case 'UPDATE_CUSTOMER_POINTS':
       return {
         ...state,

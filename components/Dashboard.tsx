@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
   BarChart, 
@@ -11,7 +12,7 @@ import {
   Area
 } from 'recharts';
 import { GlobalState } from '../types';
-import { ArrowUpRight, ArrowDownRight, Users, DollarSign, PackageCheck, AlertTriangle, Filter } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Users, DollarSign, PackageCheck, AlertTriangle, Filter, Clock } from 'lucide-react';
 
 interface DashboardProps {
   data: GlobalState;
@@ -21,6 +22,11 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
   const totalSales = data.sales.reduce((acc, curr) => acc + curr.total, 0);
   const lowStockItems = data.inventory.filter(i => i.stock <= i.minStock).length;
   const totalCustomers = data.customers.length;
+  
+  // Expiry Check Logic
+  const expiringSoonItems = data.inventory.filter(item => 
+      item.batches.some(batch => new Date(batch.expiryDate) < new Date('2025-01-01')) // Mock date for demo
+  );
 
   const chartData = [
     { name: 'Mon', sales: 4000, hq: 2500, branch1: 1500 },
@@ -111,7 +117,6 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
         />
       </div>
 
-      {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Sales Chart */}
         <div className="lg:col-span-2 bg-white p-8 rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-slate-50">
@@ -125,7 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
                 <option>Last 30 Days</option>
             </select>
           </div>
-          <div className="h-[350px]">
+          <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
                 <defs>
@@ -147,26 +152,53 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
           </div>
         </div>
 
-        {/* Branch Performance */}
-        <div className="bg-white p-8 rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-slate-50">
-          <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-             <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-             Branch Comparison
-          </h3>
-          <div className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 11}} dy={10} />
-                <Tooltip 
-                    cursor={{fill: '#f8fafc'}}
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)' }}
-                />
-                <Bar dataKey="hq" name="HQ" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="branch1" name="Branch" fill="#f97316" radius={[4, 4, 0, 0]} />
-                </BarChart>
-            </ResponsiveContainer>
-          </div>
+        {/* Right Column: Branch & Expiry */}
+        <div className="space-y-6">
+            {/* Branch Performance */}
+            <div className="bg-white p-6 rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-slate-50">
+                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                    <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                    Branch Comparison
+                </h3>
+                <div className="h-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData} barGap={4}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} dy={10} />
+                        <Tooltip 
+                            cursor={{fill: '#f8fafc'}}
+                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)' }}
+                        />
+                        <Bar dataKey="hq" name="HQ" fill="#2563eb" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="branch1" name="Branch" fill="#f97316" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+
+            {/* Expiry Alert Widget (Critical for Pharmacy) */}
+            <div className="bg-red-50 p-6 rounded-3xl border border-red-100">
+                <div className="flex items-center gap-3 mb-3">
+                    <div className="bg-red-100 p-2 rounded-full">
+                        <Clock className="w-5 h-5 text-red-600" />
+                    </div>
+                    <div>
+                         <h3 className="font-bold text-red-900">Near Expiry Alert</h3>
+                         <p className="text-xs text-red-700">Action needed for {expiringSoonItems.length} items</p>
+                    </div>
+                </div>
+                <div className="space-y-2 mt-2">
+                    {expiringSoonItems.slice(0, 3).map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg shadow-sm border border-red-100/50">
+                            <span className="text-xs font-bold text-slate-700">{item.name}</span>
+                            <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded font-bold">Exp Soon</span>
+                        </div>
+                    ))}
+                    {expiringSoonItems.length === 0 && (
+                        <p className="text-xs text-green-700 italic">All items are fresh!</p>
+                    )}
+                </div>
+            </div>
         </div>
       </div>
     </div>
