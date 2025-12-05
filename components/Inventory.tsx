@@ -206,7 +206,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
             <tbody className="divide-y divide-slate-100">
               {getFilteredInventory().map((item) => (
                 <React.Fragment key={item.id}>
-                    <tr className={`hover:bg-slate-50 cursor-pointer ${expandedRow === item.id ? 'bg-slate-50' : ''} ${item.stock <= item.minStock ? 'bg-red-50/50' : ''}`} onClick={() => toggleRow(item.id)}>
+                    <tr className={`hover:bg-slate-50 cursor-pointer ${expandedRow === item.id ? 'bg-slate-50' : ''} ${item.stock <= item.minStock ? 'bg-red-50' : ''}`} onClick={() => toggleRow(item.id)}>
                         <td className="px-6 py-4 text-center"><ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${expandedRow === item.id ? 'rotate-180' : ''}`} /></td>
                         <td className="px-6 py-4">
                             <div className="font-bold text-slate-800 text-sm">{item.name}</div>

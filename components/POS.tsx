@@ -753,7 +753,9 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                        <span className="text-sm text-slate-500 font-bold uppercase">Total Amount</span>
                        <div className="text-4xl font-bold text-slate-900">฿{roundedNetTotal.toLocaleString()}</div>
                        {state.settings.roundingType !== 'NONE' && roundedNetTotal !== netTotal && (
-                           <div className="text-xs text-orange-500 font-bold mt-1">Rounded from ฿{netTotal.toLocaleString()}</div>
+                           <div className="text-xs text-orange-500 font-bold mt-1">
+                               Rounded from ฿{netTotal.toLocaleString()} ({state.settings.roundingType === 'ROUND_DOWN_INT' ? 'Round Down' : '0.25 Rounding'})
+                           </div>
                        )}
                    </div>
 
