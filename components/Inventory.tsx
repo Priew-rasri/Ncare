@@ -67,6 +67,39 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
       setTransferToBranch('');
   };
 
+  const handleExportCSV = () => {
+      // 1. Convert inventory data to CSV string
+      const headers = ['ID', 'Name', 'Generic Name', 'Category', 'Price', 'Cost', 'Stock', 'Min Stock', 'Unit', 'Location'];
+      const rows = data.inventory.map(item => [
+          item.id,
+          `"${item.name}"`, // Quote strings to handle commas
+          `"${item.genericName}"`,
+          item.category,
+          item.price,
+          item.cost,
+          item.stock,
+          item.minStock,
+          item.unit,
+          item.location
+      ]);
+
+      const csvContent = [
+          headers.join(','), 
+          ...rows.map(r => r.join(','))
+      ].join('\n');
+
+      // 2. Create blob and link
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `inventory_export_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  };
+
   const getStatusBadge = (stock: number, min: number) => {
     if (stock === 0) return <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full text-xs font-bold flex items-center w-fit gap-1 border border-red-100"><AlertTriangle className="w-3 h-3" /> Out of Stock</span>;
     if (stock <= min) return <span className="bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-xs font-bold flex items-center w-fit gap-1 border border-orange-100"><AlertTriangle className="w-3 h-3" /> Low Stock</span>;
@@ -88,7 +121,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
              <button onClick={() => setShowAdjustModal(true)} className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-900 rounded-lg text-sm font-bold text-white hover:bg-slate-800 shadow-md">
                 <Settings className="w-4 h-4" /> Stock Adjustment
              </button>
-             <button className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100">
+             <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
                 <Download className="w-4 h-4" /> Export
              </button>
           </div>

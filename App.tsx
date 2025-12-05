@@ -1,5 +1,5 @@
 
-import React, { useState, useReducer, useEffect } from 'react';
+import React, { useState, useReducer, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import POS from './components/POS';
@@ -10,8 +10,8 @@ import AIAssistant from './components/AIAssistant';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import { MOCK_INVENTORY, MOCK_SALES, MOCK_PO, MOCK_EXPENSES, MOCK_BRANCHES, MOCK_SUPPLIERS, MOCK_STOCK_LOGS, MOCK_SETTINGS, MOCK_SHIFTS } from './constants';
-import { GlobalState, Action, StockLog, Shift, Customer, SystemLog, TransferRequest } from './types';
-import { Search, Bell, MapPin, ChevronDown, Menu } from 'lucide-react';
+import { GlobalState, Action, StockLog, Shift, Customer, SystemLog, TransferRequest, Notification } from './types';
+import { Search, Bell, MapPin, ChevronDown, Menu, AlertTriangle, Truck, Clock } from 'lucide-react';
 
 // Enhanced Mock Customers for CRM Demo
 const MOCK_CUSTOMERS_ENHANCED: Customer[] = [
@@ -285,6 +285,9 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
                 severity: 'INFO'
             }, ...state.systemLogs]
         };
+    
+    case 'UPDATE_CART_INSTRUCTION':
+        return state; // Logic handled in POS component locally currently, can be moved here if global cart state is needed
 
     default:
       return state;
@@ -313,6 +316,7 @@ const initialState: GlobalState = {
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [state, dispatch] = useReducer(reducer, initialState);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   // Persistence Logic
   useEffect(() => {
@@ -335,6 +339,49 @@ const App: React.FC = () => {
           localStorage.setItem('pharmaflow_db_v1', JSON.stringify(state));
       }
   }, [state]);
+
+  // Generate Notifications Logic
+  const notifications: Notification[] = useMemo(() => {
+      const notifs: Notification[] = [];
+      
+      // 1. Low Stock
+      const lowStock = state.inventory.filter(p => p.stock <= p.minStock);
+      if (lowStock.length > 0) {
+          notifs.push({
+              id: 'N-STOCK',
+              type: 'LOW_STOCK',
+              message: `${lowStock.length} items are below minimum stock level.`,
+              timestamp: 'Now',
+              read: false
+          });
+      }
+
+      // 2. Pending Transfers
+      const pendingTransfers = state.transfers.filter(t => t.toBranchId === state.currentBranch.id && t.status === 'PENDING');
+      if (pendingTransfers.length > 0) {
+           notifs.push({
+              id: 'N-TRANS',
+              type: 'TRANSFER',
+              message: `${pendingTransfers.length} incoming stock transfer requests.`,
+              timestamp: 'Now',
+              read: false
+          });
+      }
+      
+      // 3. Expiry Warning
+      const expiring = state.inventory.filter(i => i.batches.some(b => new Date(b.expiryDate) < new Date('2025-01-01')));
+      if (expiring.length > 0) {
+          notifs.push({
+              id: 'N-EXP',
+              type: 'EXPIRY',
+              message: `${expiring.length} products have batches near expiry.`,
+              timestamp: 'Daily Check',
+              read: false
+          });
+      }
+
+      return notifs;
+  }, [state.inventory, state.transfers, state.currentBranch.id]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -405,11 +452,51 @@ const App: React.FC = () => {
                      </div>
                  </div>
 
-                 <div className="flex items-center gap-4 border-l border-slate-100 pl-6">
-                    <button className="relative p-2 text-slate-400 hover:text-blue-600 transition-colors hover:bg-blue-50 rounded-full">
+                 <div className="flex items-center gap-4 border-l border-slate-100 pl-6 relative">
+                    <button 
+                        onClick={() => setShowNotifications(!showNotifications)}
+                        className="relative p-2 text-slate-400 hover:text-blue-600 transition-colors hover:bg-blue-50 rounded-full"
+                    >
                         <Bell className="w-5 h-5" />
-                        <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                        {notifications.length > 0 && (
+                             <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                        )}
                     </button>
+                    
+                    {/* Notification Dropdown */}
+                    {showNotifications && (
+                        <div className="absolute right-16 top-14 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50 animate-fade-in">
+                            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                                <h3 className="font-bold text-slate-800 text-sm">Notifications</h3>
+                                <span className="text-xs text-blue-600 font-bold bg-blue-100 px-2 py-0.5 rounded-full">{notifications.length} New</span>
+                            </div>
+                            <div className="max-h-64 overflow-y-auto">
+                                {notifications.length === 0 ? (
+                                    <div className="p-6 text-center text-slate-400 text-sm">No new notifications</div>
+                                ) : (
+                                    notifications.map(n => (
+                                        <div key={n.id} className="p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                                            <div className="flex items-start gap-3">
+                                                <div className={`p-2 rounded-full shrink-0 ${
+                                                    n.type === 'LOW_STOCK' ? 'bg-orange-100 text-orange-600' : 
+                                                    n.type === 'TRANSFER' ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'
+                                                }`}>
+                                                    {n.type === 'LOW_STOCK' && <AlertTriangle className="w-4 h-4" />}
+                                                    {n.type === 'TRANSFER' && <Truck className="w-4 h-4" />}
+                                                    {n.type === 'EXPIRY' && <Clock className="w-4 h-4" />}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-slate-700 font-medium leading-tight">{n.message}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-1">{n.timestamp}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="flex items-center gap-3 cursor-pointer p-1 rounded-full transition-all group" onClick={() => dispatch({type: 'LOGOUT'})}>
                         <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-bold shadow-md shadow-blue-200" title="Click to Logout">
                              {state.currentUser.name.charAt(0)}

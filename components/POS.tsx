@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { GlobalState, Product, CartItem, SaleRecord, Shift, HeldBill } from '../types';
-import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan, Edit3, Sticker } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan, Edit3, Sticker, UploadCloud, FileCheck, Camera } from 'lucide-react';
 
 interface POSProps {
   state: GlobalState;
@@ -30,6 +30,10 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   // QR Payment State
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrAmount, setQrAmount] = useState(0);
+
+  // Prescription Upload State
+  const [prescriptionImage, setPrescriptionImage] = useState<string | null>(null);
+  const [showRxUpload, setShowRxUpload] = useState(false);
 
   // Barcode Scanner Logic
   useEffect(() => {
@@ -179,7 +183,10 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     const itemToRemove = cart.find(i => i.id === id);
     if (itemToRemove?.requiresPrescription) {
         const othersNeedRx = cart.some(i => i.id !== id && i.requiresPrescription);
-        if (!othersNeedRx) setNeedsPrescription(false);
+        if (!othersNeedRx) {
+            setNeedsPrescription(false);
+            setPrescriptionImage(null); // Reset rx if no longer needed
+        }
     }
     setCart(prev => prev.filter(item => item.id !== id));
   };
@@ -229,11 +236,21 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       if (bill.customer) setSelectedCustomerId(bill.customer.id);
       dispatch({ type: 'RESUME_BILL', payload: bill.id });
       setShowHeldBills(false);
+      // Recheck prescription requirement
+      if (bill.items.some(i => i.requiresPrescription)) {
+          setNeedsPrescription(true);
+      }
   };
 
   const initiatePayment = (method: 'CASH' | 'QR' | 'CREDIT') => {
       if (cart.length === 0) return;
       
+      // Rx Check
+      if (needsPrescription && !prescriptionImage) {
+          setShowRxUpload(true);
+          return;
+      }
+
       const { netTotal } = calculateTotals(cart);
 
       if (method === 'QR') {
@@ -243,10 +260,14 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
           completeCheckout(method);
       }
   };
+  
+  const handleRxUpload = () => {
+      // Simulation of file upload
+      setPrescriptionImage("mock-base64-string");
+      setShowRxUpload(false);
+  };
 
   const completeCheckout = (method: 'CASH' | 'QR' | 'CREDIT') => {
-    if (needsPrescription && !window.confirm("กรุณายืนยันว่าเภสัชกรได้ตรวจสอบใบสั่งแพทย์แล้ว?")) return;
-
     const { total, totalExempt, totalVatable, subtotalVatableBase, vatAmount, discount, pointsToRedeem, netTotal } = calculateTotals(cart);
 
     const sale: SaleRecord = {
@@ -263,7 +284,8 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       paymentMethod: method,
       customerId: selectedCustomerId || undefined,
       branchId: state.currentBranch.id,
-      shiftId: activeShift?.id
+      shiftId: activeShift?.id,
+      prescriptionImage: prescriptionImage || undefined
     };
 
     dispatch({ type: 'ADD_SALE', payload: sale });
@@ -276,6 +298,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     setCart([]);
     setSelectedCustomerId('');
     setNeedsPrescription(false);
+    setPrescriptionImage(null);
     setUsePoints(false);
     setShowQRModal(false);
   };
@@ -345,6 +368,31 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                        <button onClick={() => setEditingInstructionId(null)} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200">Cancel</button>
                        <button onClick={saveInstruction} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg">Save Instruction</button>
                    </div>
+               </div>
+          </div>
+      )}
+
+      {/* Prescription Upload Modal */}
+      {showRxUpload && (
+          <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+               <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-fade-in text-center">
+                   <div className="bg-yellow-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                       <Stethoscope className="w-8 h-8 text-yellow-600" />
+                   </div>
+                   <h3 className="text-xl font-bold text-slate-800 mb-2">Prescription Required</h3>
+                   <p className="text-sm text-slate-500 mb-6">
+                       Some items in this cart are restricted (Rx). Please upload or scan a digital prescription to proceed with compliance.
+                   </p>
+                   
+                   <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 mb-6 hover:bg-slate-50 cursor-pointer transition-colors" onClick={handleRxUpload}>
+                       <UploadCloud className="w-10 h-10 text-slate-400 mx-auto mb-2" />
+                       <p className="text-sm font-bold text-slate-600">Click to Upload Image</p>
+                       <p className="text-xs text-slate-400">JPG, PNG supported</p>
+                   </div>
+
+                   <button onClick={() => setShowRxUpload(false)} className="w-full py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50">
+                       Cancel
+                   </button>
                </div>
           </div>
       )}
@@ -720,13 +768,22 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
             ) : (
                 <>
                     {needsPrescription && (
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex gap-3 animate-fade-in">
-                            <div className="bg-yellow-100 p-2 rounded-lg h-fit">
-                                <Stethoscope className="w-5 h-5 text-yellow-700" />
+                        <div className={`border rounded-xl p-3 flex gap-3 animate-fade-in ${prescriptionImage ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                            <div className={`p-2 rounded-lg h-fit ${prescriptionImage ? 'bg-green-100' : 'bg-yellow-100'}`}>
+                                {prescriptionImage ? <FileCheck className="w-5 h-5 text-green-700" /> : <Stethoscope className="w-5 h-5 text-yellow-700" />}
                             </div>
-                            <div>
-                                <h4 className="text-sm font-bold text-yellow-800">Prescription Required</h4>
-                                <p className="text-xs text-yellow-700 mt-1">รายการยานี้ต้องได้รับการอนุมัติโดยเภสัชกร</p>
+                            <div className="flex-1">
+                                <h4 className={`text-sm font-bold ${prescriptionImage ? 'text-green-800' : 'text-yellow-800'}`}>
+                                    {prescriptionImage ? 'Prescription Attached' : 'Prescription Required'}
+                                </h4>
+                                <p className={`text-xs mt-1 ${prescriptionImage ? 'text-green-700' : 'text-yellow-700'}`}>
+                                    {prescriptionImage ? 'Digital Rx loaded. Ready for review.' : 'Items marked Rx require documentation.'}
+                                </p>
+                                {!prescriptionImage && (
+                                    <button onClick={() => setShowRxUpload(true)} className="mt-2 text-xs font-bold text-blue-600 hover:underline flex items-center gap-1">
+                                        <Camera className="w-3 h-3"/> Upload Now
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}

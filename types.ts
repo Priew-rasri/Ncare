@@ -109,6 +109,7 @@ export interface SaleRecord {
   paymentMethod: 'CASH' | 'QR' | 'CREDIT';
   branchId: string;
   shiftId?: string;
+  prescriptionImage?: string; // Base64 or URL for GPP compliance
 }
 
 export interface Supplier {
@@ -188,6 +189,14 @@ export interface Settings {
   vatRate: number;
   printerIp: string;
   receiptFooter: string;
+}
+
+export interface Notification {
+    id: string;
+    type: 'LOW_STOCK' | 'EXPIRY' | 'TRANSFER' | 'SYSTEM';
+    message: string;
+    timestamp: string;
+    read: boolean;
 }
 
 export interface GlobalState {
