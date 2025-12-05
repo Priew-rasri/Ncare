@@ -1,6 +1,4 @@
 
-
-
 import React, { useMemo } from 'react';
 import { 
   BarChart, 
@@ -81,12 +79,19 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
                  .slice(0, 5);
   }, [data.sales]);
 
-  // 5. Mock Live Queue for "Ncare Service"
-  const queueList = [
-      { id: 'A052', status: 'COUNSELING', name: 'คุณสมชาย' },
-      { id: 'A053', status: 'WAITING', name: 'คุณหญิง' },
-      { id: 'A054', status: 'READY', name: 'คุณลุง' },
-  ];
+  // 5. Live Queue for "Ncare Service"
+  const queueList = useMemo(() => {
+      // Get today's sales and show last 4
+      const today = new Date().toLocaleDateString('en-CA');
+      return data.sales
+        .filter(s => new Date(s.date).toLocaleDateString('en-CA') === today)
+        .slice(0, 4)
+        .map(s => ({
+            id: s.queueNumber || 'A001',
+            status: 'READY',
+            name: s.taxInvoiceDetails?.name || 'Guest'
+        }));
+  }, [data.sales]);
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
@@ -210,20 +215,24 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
                     <h3 className="font-bold text-lg">Live Queue</h3>
                 </div>
                 <div className="space-y-3 relative z-10">
-                    {queueList.map((q, i) => (
-                        <div key={i} className="flex justify-between items-center bg-white/10 p-3 rounded-xl border border-white/10">
-                            <div>
-                                <span className="text-xs text-slate-300 block">{q.name}</span>
-                                <span className="font-bold text-xl">{q.id}</span>
+                    {queueList.length === 0 ? (
+                        <div className="text-center text-slate-400 py-4">No active queue today</div>
+                    ) : (
+                        queueList.map((q, i) => (
+                            <div key={i} className="flex justify-between items-center bg-white/10 p-3 rounded-xl border border-white/10">
+                                <div>
+                                    <span className="text-xs text-slate-300 block">{q.name}</span>
+                                    <span className="font-bold text-xl">{q.id}</span>
+                                </div>
+                                <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                                    q.status === 'READY' ? 'bg-green-500 text-white' : 
+                                    q.status === 'COUNSELING' ? 'bg-blue-500 text-white' : 'bg-orange-500 text-white'
+                                }`}>
+                                    {q.status}
+                                </span>
                             </div>
-                            <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
-                                q.status === 'READY' ? 'bg-green-500 text-white' : 
-                                q.status === 'COUNSELING' ? 'bg-blue-500 text-white' : 'bg-orange-500 text-white'
-                            }`}>
-                                {q.status}
-                            </span>
-                        </div>
-                    ))}
+                        ))
+                    )}
                 </div>
                 <div className="mt-4 text-center">
                     <button className="text-xs font-bold text-slate-300 hover:text-white underline">Manage Queue</button>

@@ -34,6 +34,7 @@ export interface StockLog {
   staffName: string;
   note?: string;
   batchId?: string;
+  runningBalance?: number; // Calculated field for Stock Card
 }
 
 export interface SystemLog {
@@ -94,6 +95,7 @@ export interface HeldBill {
 
 export interface SaleRecord {
   id: string; // Format: INV-YYMM-XXXX
+  queueNumber?: string; // Format: A001
   date: string;
   customerId?: string;
   items: CartItem[];
@@ -113,6 +115,7 @@ export interface SaleRecord {
   branchId: string;
   shiftId?: string;
   prescriptionImage?: string; // Base64 or URL for GPP compliance
+  doctorName?: string; // For clinic referral
   
   status: 'COMPLETED' | 'VOID';
   voidReason?: string;
@@ -183,6 +186,15 @@ export interface TransferRequest {
     requestedBy: string;
 }
 
+export interface CashTransaction {
+    id: string;
+    timestamp: string;
+    type: 'PAY_OUT' | 'CASH_DROP'; // Pay Out = Expense, Cash Drop = Move to Safe
+    amount: number;
+    reason: string;
+    staffName: string;
+}
+
 export interface Shift {
   id: string;
   staffName: string;
@@ -197,6 +209,8 @@ export interface Shift {
   totalQrSales: number;
   totalCreditSales: number;
   totalSales: number; // Sum of all
+  
+  cashTransactions: CashTransaction[]; // Petty cash tracking
 
   status: 'OPEN' | 'CLOSED';
 }
@@ -253,6 +267,7 @@ export type Action =
   | { type: 'SWITCH_BRANCH'; payload: string }
   | { type: 'OPEN_SHIFT'; payload: { staff: string; startCash: number } }
   | { type: 'CLOSE_SHIFT'; payload: { actualCash: number } }
+  | { type: 'ADD_CASH_TRANSACTION'; payload: { type: 'PAY_OUT' | 'CASH_DROP'; amount: number; reason: string } }
   | { type: 'UPDATE_SETTINGS'; payload: Settings }
   | { type: 'HOLD_BILL'; payload: HeldBill }
   | { type: 'RESUME_BILL'; payload: string } 

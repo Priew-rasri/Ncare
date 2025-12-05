@@ -253,6 +253,7 @@ export const MOCK_SHIFTS: Shift[] = [
         totalCashSales: 4400,
         totalQrSales: 0,
         totalCreditSales: 0,
+        cashTransactions: [],
         status: 'CLOSED' 
     },
     { 
@@ -267,6 +268,7 @@ export const MOCK_SHIFTS: Shift[] = [
         totalCashSales: 2500,
         totalQrSales: 0,
         totalCreditSales: 0, 
+        cashTransactions: [],
         status: 'CLOSED' 
     }, 
 ];

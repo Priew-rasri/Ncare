@@ -1,8 +1,7 @@
 
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { GlobalState, Product, CartItem, SaleRecord, Shift, HeldBill } from '../types';
-import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan, Edit3, Sticker, UploadCloud, FileCheck, Camera, History, AlertTriangle, FileText } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan, Edit3, Sticker, UploadCloud, FileCheck, Camera, History, AlertTriangle, FileText, Briefcase, Coins, ArrowRightLeft, MousePointerClick } from 'lucide-react';
 
 interface POSProps {
   state: GlobalState;
@@ -16,6 +15,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [needsPrescription, setNeedsPrescription] = useState(false);
   const [activeCategory, setActiveCategory] = useState('ALL');
   const [usePoints, setUsePoints] = useState(false);
+  const [doctorName, setDoctorName] = useState('');
   
   // Modals
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -27,6 +27,13 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrAmount, setQrAmount] = useState(0);
   const [showRxUpload, setShowRxUpload] = useState(false);
+  const [showCashOpsModal, setShowCashOpsModal] = useState(false);
+  const [showHeldBillsModal, setShowHeldBillsModal] = useState(false);
+
+  // Cash Ops State
+  const [cashOpsType, setCashOpsType] = useState<'PAY_OUT' | 'CASH_DROP'>('PAY_OUT');
+  const [cashOpsAmount, setCashOpsAmount] = useState<string>('');
+  const [cashOpsReason, setCashOpsReason] = useState<string>('');
 
   // New Payment Modal State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -166,14 +173,12 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const { total: cartTotal, discount, netTotal } = calculateTotals(cart);
 
   const addToCart = (product: Product) => {
-    // Stock Guard
     const existingQty = cart.find(x => x.id === product.id)?.quantity || 0;
     if (existingQty + 1 > product.stock) {
         alert(`❌ Insufficient Stock! Available: ${product.stock}`);
         return;
     }
 
-    // Allergy Check
     if (selectedCustomer) {
         const allergy = selectedCustomer.allergies?.find(a => 
             product.genericName.toLowerCase().includes(a.toLowerCase()) || 
@@ -237,6 +242,34 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       setUsePoints(false);
       setNeedsPrescription(false);
   };
+  
+  const handleResumeBill = (bill: HeldBill) => {
+      setCart(bill.items);
+      if (bill.customer) setSelectedCustomerId(bill.customer.id);
+      dispatch({ type: 'RESUME_BILL', payload: bill.id }); // Removes from Held list
+      setShowHeldBillsModal(false);
+  };
+  
+  const handleDeleteHeldBill = (id: string) => {
+      if(window.confirm("Delete this held bill?")) {
+          dispatch({ type: 'DELETE_HELD_BILL', payload: id });
+      }
+  }
+
+  const handleCashOps = () => {
+      if (!cashOpsAmount || Number(cashOpsAmount) <= 0 || !cashOpsReason) return;
+      dispatch({ 
+          type: 'ADD_CASH_TRANSACTION', 
+          payload: { 
+              type: cashOpsType, 
+              amount: Number(cashOpsAmount), 
+              reason: cashOpsReason 
+          } 
+      });
+      setShowCashOpsModal(false);
+      setCashOpsAmount('');
+      setCashOpsReason('');
+  };
 
   const initiatePayment = (method: 'CASH' | 'QR' | 'CREDIT') => {
       if (cart.length === 0) return;
@@ -253,7 +286,6 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
           setShowPaymentModal(true);
           setTenderedAmount('');
       } else {
-          // Credit
           completeCheckout(method);
       }
   };
@@ -279,13 +311,13 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       branchId: state.currentBranch.id,
       shiftId: activeShift?.id,
       prescriptionImage: prescriptionImage || undefined,
+      doctorName: doctorName || undefined,
       status: 'COMPLETED',
       taxInvoiceDetails: showTaxInvoiceForm ? { ...taxDetails } : undefined
     };
 
     dispatch({ type: 'ADD_SALE', payload: sale });
     
-    // Simulate delay to get ID for printing
     setTimeout(() => {
         setLastSale(sale); 
         setShowReceipt(true);
@@ -296,11 +328,18 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     setNeedsPrescription(false);
     setPrescriptionImage(null);
     setUsePoints(false);
+    setDoctorName('');
     setShowQRModal(false);
     setShowPaymentModal(false);
     setShowTaxInvoiceForm(false);
     setTaxDetails({ name: '', taxId: '', address: '' });
   };
+
+  useEffect(() => {
+      if (showReceipt && state.sales.length > 0) {
+          setLastSale(state.sales[0]);
+      }
+  }, [showReceipt, state.sales]);
 
   const handlePrint = () => {
       if (printMode === 'A4') {
@@ -309,13 +348,11 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
           document.body.classList.remove('print-a4');
       }
       window.print();
-      // Cleanup
       document.body.classList.remove('print-a4');
   }
 
   const handleVoidSale = () => {
       if (!saleToVoid || !voidReason) return;
-      
       if (window.confirm("Confirm VOID? This will reverse stock and financial records.")) {
           dispatch({ 
               type: 'VOID_SALE', 
@@ -365,6 +402,71 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-9rem)] gap-6 animate-fade-in pb-2 relative">
       
+      {/* Held Bills Modal */}
+      {showHeldBillsModal && (
+          <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-6">
+                  <div className="flex justify-between items-center mb-6">
+                      <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                          <PauseCircle className="w-6 h-6 text-orange-500" /> Held Bills (Paused Transactions)
+                      </h3>
+                      <button onClick={() => setShowHeldBillsModal(false)}><X className="w-6 h-6"/></button>
+                  </div>
+                  {state.heldBills.length === 0 ? (
+                      <div className="text-center py-10 text-slate-400">No held bills currently.</div>
+                  ) : (
+                      <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+                          {state.heldBills.map(bill => (
+                              <div key={bill.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-between items-center">
+                                  <div>
+                                      <div className="font-bold text-slate-700">{bill.id}</div>
+                                      <div className="text-xs text-slate-500">{bill.timestamp}</div>
+                                      <div className="text-xs text-slate-500 mt-1">Customer: {bill.customer?.name || 'Guest'}</div>
+                                      <div className="text-xs text-slate-500">{bill.items.length} items</div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                      <button onClick={() => handleResumeBill(bill)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-700">
+                                          <PlayCircle className="w-4 h-4"/> Resume
+                                      </button>
+                                      <button onClick={() => handleDeleteHeldBill(bill.id)} className="bg-white border border-red-200 text-red-500 px-3 py-2 rounded-lg hover:bg-red-50">
+                                          <Trash2 className="w-4 h-4"/>
+                                      </button>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  )}
+              </div>
+          </div>
+      )}
+
+      {/* Cash Ops Modal */}
+      {showCashOpsModal && (
+          <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6">
+                  <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-bold text-slate-800 flex items-center gap-2"><ArrowRightLeft className="w-5 h-5"/> Drawer Ops</h3>
+                      <button onClick={() => setShowCashOpsModal(false)}><X className="w-5 h-5"/></button>
+                  </div>
+                  <div className="flex bg-slate-100 rounded-xl p-1 mb-4">
+                      <button onClick={() => setCashOpsType('PAY_OUT')} className={`flex-1 py-2 text-xs font-bold rounded-lg ${cashOpsType === 'PAY_OUT' ? 'bg-white shadow text-red-600' : 'text-slate-500'}`}>Pay Out / Expense</button>
+                      <button onClick={() => setCashOpsType('CASH_DROP')} className={`flex-1 py-2 text-xs font-bold rounded-lg ${cashOpsType === 'CASH_DROP' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Cash Drop (Safe)</button>
+                  </div>
+                  <div className="space-y-3">
+                      <div>
+                          <label className="text-xs font-bold text-slate-500">Amount</label>
+                          <input type="number" value={cashOpsAmount} onChange={e => setCashOpsAmount(e.target.value)} className="w-full p-3 border rounded-xl font-bold text-lg" placeholder="0.00" autoFocus />
+                      </div>
+                      <div>
+                          <label className="text-xs font-bold text-slate-500">Reason</label>
+                          <input type="text" value={cashOpsReason} onChange={e => setCashOpsReason(e.target.value)} className="w-full p-3 border rounded-xl text-sm" placeholder="e.g. Buying Ice, Move to Safe" />
+                      </div>
+                      <button onClick={handleCashOps} className="w-full py-3 bg-slate-800 text-white font-bold rounded-xl mt-2">Confirm</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Payment Modal */}
       {showPaymentModal && (
           <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -558,6 +660,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                  </div>
                  <div className="receipt-divider"></div>
                  <div className="receipt-row"><span>Bill: {lastSale.id}</span><span>{lastSale.date.split(' ')[0]} {lastSale.date.split(' ')[1]}</span></div>
+                 {lastSale.doctorName && <div className="receipt-row"><span>Dr: {lastSale.doctorName}</span></div>}
                  <div className="receipt-divider"></div>
                  {lastSale.items.map((item,i) => (
                      <div key={i} className="receipt-row"><span>{item.name} x{item.quantity}</span><span>{(item.price*item.quantity).toFixed(2)}</span></div>
@@ -572,7 +675,15 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                  <div className="receipt-divider"></div>
                  <div className="receipt-row"><span>Cash Tendered</span><span>{lastSale.tenderedAmount?.toFixed(2) || '-'}</span></div>
                  <div className="receipt-row"><span>Change</span><span>{lastSale.change?.toFixed(2) || '-'}</span></div>
-                 <div className="receipt-footer">Thank You</div>
+                 <div className="receipt-divider"></div>
+                 {/* Queue Number Section */}
+                 {lastSale.queueNumber && (
+                    <div className="text-center mt-2 mb-2">
+                        <div style={{fontSize: '10px'}}>QUEUE NO</div>
+                        <div style={{fontSize: '32px', fontWeight: 'bold'}}>{lastSale.queueNumber}</div>
+                    </div>
+                 )}
+                 <div className="receipt-footer">{state.settings.receiptFooter}</div>
              </div>
 
              {/* Hidden Print Area: A4 Full Tax Invoice */}
@@ -684,8 +795,15 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                      Shift: <span className="font-bold text-slate-700">{activeShift.staffName}</span>
                  </div>
                  <div className="flex gap-2">
+                     <button onClick={() => setShowHeldBillsModal(true)} className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 relative">
+                         <PauseCircle className="w-4 h-4 text-orange-500"/> 
+                         Bills ({state.heldBills.length})
+                     </button>
+                     <button onClick={() => setShowCashOpsModal(true)} className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                         <Coins className="w-4 h-4"/> Drawer
+                     </button>
                      <button onClick={() => setShowHistoryModal(true)} className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                         <History className="w-4 h-4" /> Bills
+                         <History className="w-4 h-4" /> Transactions
                      </button>
                      <button 
                         onClick={() => { setCloseShiftActual(0); setShowCloseShiftModal(true); }}
@@ -772,7 +890,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
         </div>
 
         <div className="p-5 border-b border-slate-100 bg-white">
-            <div className="relative mb-4">
+            <div className="relative mb-3">
                 <select 
                     className="w-full p-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none"
                     value={selectedCustomerId}
@@ -782,6 +900,17 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                     {state.customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 <User className="absolute left-3 top-3 text-slate-400 w-5 h-5 pointer-events-none" />
+            </div>
+            
+            <div className="relative">
+                 <input 
+                    type="text" 
+                    placeholder="Doctor Name (Optional)" 
+                    className="w-full pl-10 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
+                    value={doctorName}
+                    onChange={(e) => setDoctorName(e.target.value)}
+                />
+                <Briefcase className="absolute left-3 top-2.5 text-slate-400 w-4 h-4 pointer-events-none" />
             </div>
         </div>
 

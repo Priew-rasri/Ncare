@@ -1,5 +1,4 @@
 
-
 import React, { useState, useReducer, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -42,6 +41,14 @@ const generateDocId = (prefix: string, sales: SaleRecord[]): string => {
     return `${prefixDate}${nextSeq.toString().padStart(4, '0')}`;
 };
 
+// Helper for Daily Queue Number
+const generateQueueNumber = (sales: SaleRecord[]): string => {
+    const today = new Date().toLocaleDateString('en-CA');
+    const todaysSales = sales.filter(s => new Date(s.date).toLocaleDateString('en-CA') === today);
+    const count = todaysSales.length + 1;
+    return `A${count.toString().padStart(3, '0')}`;
+}
+
 const reducer = (state: GlobalState, action: Action): GlobalState => {
   switch (action.type) {
     case 'LOGIN':
@@ -74,9 +81,10 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
     case 'LOAD_STATE':
         return action.payload;
     case 'ADD_SALE':
-        // Generate proper Running Number
+        // Generate proper Running Number & Queue
         const newSaleId = generateDocId('INV', state.sales);
-        const saleRecord = { ...action.payload, id: newSaleId };
+        const newQueue = generateQueueNumber(state.sales);
+        const saleRecord = { ...action.payload, id: newSaleId, queueNumber: newQueue };
 
         // 1. FEFO Logic for Inventory Update
         const updatedInventoryFEFO = state.inventory.map(product => {
@@ -168,18 +176,15 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             s.id === saleId ? { ...s, status: 'VOID' as const, voidReason: reason, voidBy: user } : s
         );
 
-        // 2. Return Stock (Simple return to inventory, FEFO reverse is complex so we just add to stock)
-        // Ideally we should add to a specific batch, but here we'll add to the last batch or create a 'Return' batch
+        // 2. Return Stock
         const restoredInventory = state.inventory.map(prod => {
             const item = saleToVoid.items.find(i => i.id === prod.id);
             if (!item) return prod;
             
-            // Add quantity back to the last batch or a default one
             const batches = [...prod.batches];
             if (batches.length > 0) {
                 batches[batches.length - 1].quantity += item.quantity;
             } else {
-                 // Create dummy batch if none exist
                  batches.push({
                      lotNumber: 'RETURNED',
                      expiryDate: '2025-12-31',
@@ -352,24 +357,50 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             totalCashSales: 0,
             totalQrSales: 0,
             totalCreditSales: 0,
+            cashTransactions: [],
             status: 'OPEN'
         };
         return { ...state, activeShift: newShift };
         
     case 'CLOSE_SHIFT':
         if (!state.activeShift) return state;
+        // Calculate Expected Cash: Start + Cash Sales - Pay Outs + Cash Drops
+        // Wait, Cash Drops usually reduce drawer cash, so we subtract both PayOut and Drop from "Expected in Drawer"
+        // But actual cash count should match this.
+        
+        const totalPayOut = state.activeShift.cashTransactions
+            .filter(t => t.type === 'PAY_OUT' || t.type === 'CASH_DROP')
+            .reduce((acc, curr) => acc + curr.amount, 0);
+
         const closedShift: Shift = {
             ...state.activeShift,
             endTime: new Date().toLocaleString(),
             status: 'CLOSED',
             actualCash: action.payload.actualCash,
-            // Expected Cash is Start + Cash Sales Only
-            expectedCash: state.activeShift.startCash + state.activeShift.totalCashSales
+            expectedCash: (state.activeShift.startCash + state.activeShift.totalCashSales) - totalPayOut
         };
         return { 
             ...state, 
             activeShift: null, 
             shiftHistory: [closedShift, ...state.shiftHistory] 
+        };
+    
+    case 'ADD_CASH_TRANSACTION':
+        if (!state.activeShift) return state;
+        const newTx = {
+            id: `TX-${Date.now()}`,
+            timestamp: new Date().toLocaleTimeString(),
+            type: action.payload.type,
+            amount: action.payload.amount,
+            reason: action.payload.reason,
+            staffName: state.currentUser?.name || 'Unknown'
+        };
+        return {
+            ...state,
+            activeShift: {
+                ...state.activeShift,
+                cashTransactions: [...state.activeShift.cashTransactions, newTx]
+            }
         };
         
     case 'UPDATE_SETTINGS':
@@ -466,7 +497,6 @@ const App: React.FC = () => {
       if (savedState) {
           try {
               const parsed = JSON.parse(savedState);
-              // Ensure we don't load a logged-in user session by default for security
               const mergedState = { ...parsed, transfers: parsed.transfers || MOCK_TRANSFERS };
               dispatch({ type: 'LOAD_STATE', payload: { ...mergedState, currentUser: null, activeShift: parsed.activeShift } }); 
           } catch (e) {
@@ -476,7 +506,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-      if (state.currentUser) { // Only save if system is being used
+      if (state.currentUser) { 
           localStorage.setItem('pharmaflow_db_v1', JSON.stringify(state));
       }
   }, [state]);
@@ -484,8 +514,6 @@ const App: React.FC = () => {
   // Generate Notifications Logic
   const notifications: Notification[] = useMemo(() => {
       const notifs: Notification[] = [];
-      
-      // 1. Low Stock
       const lowStock = state.inventory.filter(p => p.stock <= p.minStock);
       if (lowStock.length > 0) {
           notifs.push({
@@ -496,8 +524,6 @@ const App: React.FC = () => {
               read: false
           });
       }
-
-      // 2. Pending Transfers
       const pendingTransfers = state.transfers.filter(t => t.toBranchId === state.currentBranch.id && t.status === 'PENDING');
       if (pendingTransfers.length > 0) {
            notifs.push({
@@ -508,8 +534,6 @@ const App: React.FC = () => {
               read: false
           });
       }
-      
-      // 3. Expiry Warning
       const expiring = state.inventory.filter(i => i.batches.some(b => new Date(b.expiryDate) < new Date('2025-01-01')));
       if (expiring.length > 0) {
           notifs.push({
@@ -520,7 +544,6 @@ const App: React.FC = () => {
               read: false
           });
       }
-
       return notifs;
   }, [state.inventory, state.transfers, state.currentBranch.id]);
 
@@ -535,13 +558,11 @@ const App: React.FC = () => {
       case 'crm':
         return <CRM data={state} />;
       case 'accounting':
-        // RBAC: Staff cannot see Accounting
         if (state.currentUser?.role === 'STAFF') return <div className="text-center p-10 text-slate-500">Access Denied: Requires Manager Privileges</div>;
         return <Accounting data={state} dispatch={dispatch} />;
       case 'ai-assistant':
         return <AIAssistant data={state} />;
       case 'settings':
-         // RBAC: Staff cannot see Settings
         if (state.currentUser?.role === 'STAFF') return <div className="text-center p-10 text-slate-500">Access Denied: Requires Manager Privileges</div>;
         return <Settings data={state} dispatch={dispatch} />;
       default:
@@ -604,7 +625,6 @@ const App: React.FC = () => {
                         )}
                     </button>
                     
-                    {/* Notification Dropdown */}
                     {showNotifications && (
                         <div className="absolute right-16 top-14 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50 animate-fade-in">
                             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
