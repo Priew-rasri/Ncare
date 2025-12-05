@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { GlobalState, TransferRequest, Product, ProductCategory, Batch } from '../types';
 import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight, TrendingUp, PieChart, Truck, ArrowLeftRight, Printer, Tag, FileText, AlertOctagon, Plus, Edit, Trash2 } from 'lucide-react';
@@ -143,6 +142,23 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         item.barcode.includes(searchTerm)
       );
+  };
+  
+  // Running Balance Calculation for Stock Card
+  const getStockCardData = (productId: string) => {
+      const logs = data.stockLogs
+        .filter(log => log.productId === productId)
+        // Sort Ascending (Oldest first) to calculate balance
+        .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      let runningBalance = 0;
+      const logsWithBalance = logs.map(log => {
+          runningBalance += log.quantity;
+          return { ...log, currentBalance: runningBalance };
+      });
+      
+      // Return reversed (Newest first) for display
+      return logsWithBalance.reverse();
   };
 
   // --- Sub-Renderers ---
@@ -671,16 +687,16 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
           </div>
       )}
 
-      {/* Stock Card Modal */}
+      {/* Stock Card Modal (Updated with Running Balance) */}
       {showStockCard && stockCardProduct && (
           <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
                    <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                        <div>
                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                               <FileText className="w-6 h-6 text-blue-600" /> Stock Card
+                               <FileText className="w-6 h-6 text-blue-600" /> Stock Card (Ledger)
                            </h3>
-                           <p className="text-sm text-slate-500">{stockCardProduct.name} (Lot Control)</p>
+                           <p className="text-sm text-slate-500">{stockCardProduct.name} (Calculated Running Balance)</p>
                        </div>
                        <button onClick={() => setShowStockCard(false)}><X className="w-6 h-6 text-slate-400" /></button>
                    </div>
@@ -692,19 +708,18 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                                    <th className="p-4">Ref Doc</th>
                                    <th className="p-4">Action</th>
                                    <th className="p-4 text-right">In/Out</th>
-                                   <th className="p-4 text-right">Balance</th>
+                                   <th className="p-4 text-right bg-blue-50/50">Balance</th>
                                    <th className="p-4">Staff</th>
                                </tr>
                            </thead>
                            <tbody className="divide-y divide-slate-100">
-                               {data.stockLogs
-                                .filter(log => log.productId === stockCardProduct.id)
-                                .map(log => (
+                               {getStockCardData(stockCardProduct.id).map(log => (
                                    <tr key={log.id} className="hover:bg-slate-50">
                                        <td className="p-4 text-slate-500 font-mono text-xs">{log.date}</td>
                                        <td className="p-4 text-xs">{log.note}</td>
                                        <td className="p-4">
                                            <span className={`px-2 py-1 rounded text-[10px] font-bold ${
+                                               log.action === 'SALE' ? 'bg-blue-50 text-blue-700' :
                                                log.quantity > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                            }`}>
                                                {log.action}
@@ -713,7 +728,9 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                                        <td className={`p-4 text-right font-bold ${log.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
                                            {log.quantity > 0 ? '+' : ''}{log.quantity}
                                        </td>
-                                       <td className="p-4 text-right font-bold text-slate-800">-</td>
+                                       <td className="p-4 text-right font-bold text-slate-800 bg-blue-50/20 font-mono">
+                                            {log.currentBalance}
+                                       </td>
                                        <td className="p-4 text-xs text-slate-500">{log.staffName}</td>
                                    </tr>
                                ))}

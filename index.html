@@ -1,9 +1,10 @@
-
 <!DOCTYPE html>
 <html lang="th">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="theme-color" content="#2563eb" />
+    <link rel="manifest" href="/manifest.json" />
     <title>Ncare ERP</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -13,7 +14,9 @@
         font-family: 'Sarabun', sans-serif;
         background-color: #f3f4f6;
         color: #1e293b;
+        -webkit-tap-highlight-color: transparent;
       }
+      /* Custom Scrollbar */
       ::-webkit-scrollbar {
         width: 6px;
         height: 6px;
@@ -27,6 +30,10 @@
       }
       ::-webkit-scrollbar-thumb:hover {
         background: #94a3b8; 
+      }
+      
+      .custom-scrollbar::-webkit-scrollbar {
+          height: 4px;
       }
       
       .animate-fade-in {
@@ -98,7 +105,7 @@
         .sticker-item {
             width: 80mm;
             height: 50mm;
-            border: 1px dashed #ccc; /* Remove dashed in real prod, kept for preview */
+            border: 1px solid #eee; /* Light border for preview guidance */
             page-break-after: always;
             padding: 4mm;
             position: relative;
@@ -121,7 +128,7 @@
             top: 0;
             width: 60mm;
             height: 40mm;
-            border: 1px dashed #000;
+            border: 1px solid #000;
             padding: 2mm;
             text-align: center;
         }
