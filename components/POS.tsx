@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { GlobalState, Product, CartItem, SaleRecord } from '../types';
-import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, AlertTriangle, ShieldCheck, ShoppingBag, FileText, Stethoscope } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, AlertTriangle, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, Receipt, CheckCircle, Barcode, Printer } from 'lucide-react';
 
 interface POSProps {
   state: GlobalState;
@@ -13,43 +13,44 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [needsPrescription, setNeedsPrescription] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('ALL');
+  
+  // Receipt State
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [lastSale, setLastSale] = useState<SaleRecord | null>(null);
 
   const selectedCustomer = useMemo(() => 
     state.customers.find(c => c.id === selectedCustomerId), 
   [state.customers, selectedCustomerId]);
 
   const filteredProducts = useMemo(() => {
-    return state.inventory.filter(p => 
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      p.genericName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [state.inventory, searchTerm]);
+    return state.inventory.filter(p => {
+        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                              p.genericName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              p.barcode.includes(searchTerm);
+        const matchesCat = activeCategory === 'ALL' || p.category === activeCategory;
+        return matchesSearch && matchesCat;
+    });
+  }, [state.inventory, searchTerm, activeCategory]);
 
-  // Drug Interaction/Allergy Check Logic
   const getWarnings = (product: Product) => {
       if (!selectedCustomer) return null;
-      // Mock allergy check
       const allergy = selectedCustomer.allergies?.find(a => 
           product.genericName.toLowerCase().includes(a.toLowerCase()) || 
           (product.genericName === 'Amoxicillin' && a === 'Penicillin')
       );
-      if (allergy) return `ลูกค้าแพ้ยา: ${allergy}`;
+      if (allergy) return `แพ้ยา: ${allergy}`;
       return null;
   };
 
   const addToCart = (product: Product) => {
-    // Check allergy
     const warning = getWarnings(product);
     if (warning) {
-        if (!window.confirm(`⚠️ SAFETY ALERT!\n\n${warning}\n\nยืนยันการจ่ายยานี้หรือไม่?`)) {
-            return;
-        }
+        if (!window.confirm(`⚠️ SAFETY CHECK REQUIRED\n\nลูกค้ามีประวัติ ${warning}\n\nต้องการยืนยันการจ่ายยานี้หรือไม่?`)) return;
     }
 
-    // Check Prescription Requirement
     if (product.requiresPrescription && !needsPrescription) {
         setNeedsPrescription(true);
-        // In a real app, this would trigger a modal to upload Rx image
     }
 
     setCart(prev => {
@@ -64,7 +65,6 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const removeFromCart = (id: string) => {
     const itemToRemove = cart.find(i => i.id === id);
     if (itemToRemove?.requiresPrescription) {
-        // Check if any other items need Rx
         const othersNeedRx = cart.some(i => i.id !== id && i.requiresPrescription);
         if (!othersNeedRx) setNeedsPrescription(false);
     }
@@ -85,14 +85,11 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
 
   const handleCheckout = (method: 'CASH' | 'QR' | 'CREDIT') => {
     if (cart.length === 0) return;
-
-    if (needsPrescription && !window.confirm("ยืนยันว่าได้ตรวจสอบใบสั่งแพทย์ (Prescription) ถูกต้องแล้ว?")) {
-        return;
-    }
+    if (needsPrescription && !window.confirm("กรุณายืนยันว่าเภสัชกรได้ตรวจสอบใบสั่งแพทย์แล้ว?")) return;
 
     const sale: SaleRecord = {
       id: `INV-${Date.now()}`,
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toLocaleString('th-TH'),
       items: cart,
       total: cartTotal,
       paymentMethod: method,
@@ -101,11 +98,9 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     };
 
     dispatch({ type: 'ADD_SALE', payload: sale });
-    
     cart.forEach(item => {
       dispatch({ type: 'UPDATE_STOCK', payload: { productId: item.id, quantity: -item.quantity } });
     });
-
     if (selectedCustomerId) {
         dispatch({ 
             type: 'UPDATE_CUSTOMER_POINTS', 
@@ -113,216 +108,264 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
         });
     }
 
+    setLastSale(sale);
+    setShowReceipt(true);
     setCart([]);
     setSelectedCustomerId('');
     setNeedsPrescription(false);
-    alert('บันทึกการขายเรียบร้อย! (Transaction Complete)');
   };
 
+  const categories = ['ALL', ...Array.from(new Set(state.inventory.map(p => p.category)))];
+
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-8rem)] gap-6 animate-fade-in pb-4">
-      {/* Product List Area */}
-      <div className="lg:w-2/3 bg-white rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-100 flex flex-col overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center space-x-4 bg-white sticky top-0 z-10">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-            <input 
-              type="text" 
-              placeholder="Scan Barcode or Search Product..." 
-              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-0 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              autoFocus
-            />
-          </div>
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-9rem)] gap-6 animate-fade-in pb-2 relative">
+      {/* Receipt Modal */}
+      {showReceipt && lastSale && (
+        <div className="absolute inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-fade-in">
+                <div className="bg-blue-600 p-6 text-center text-white relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle,white,transparent)]"></div>
+                    <CheckCircle className="w-16 h-16 mx-auto mb-3" />
+                    <h2 className="text-2xl font-bold">Payment Success</h2>
+                    <p className="opacity-90">Thank you for your purchase!</p>
+                </div>
+                <div className="p-6">
+                    <div className="flex justify-between items-center text-sm text-slate-500 mb-4 pb-4 border-b border-dashed border-slate-200">
+                        <span>Receipt No:</span>
+                        <span className="font-mono font-bold text-slate-800">{lastSale.id}</span>
+                    </div>
+                    <div className="space-y-3 mb-6">
+                        {lastSale.items.map((item, idx) => (
+                            <div key={idx} className="flex justify-between text-sm">
+                                <span className="text-slate-600">{item.quantity} x {item.name}</span>
+                                <span className="font-bold text-slate-800">฿{(item.price * item.quantity).toLocaleString()}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="flex justify-between items-center text-lg font-bold text-slate-900 pt-4 border-t border-slate-100 mb-6">
+                        <span>Total Paid</span>
+                        <span className="text-blue-600">฿{lastSale.total.toLocaleString()}</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                        <button onClick={() => setShowReceipt(false)} className="py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50">Close</button>
+                        <button onClick={() => { alert("Printing..."); setShowReceipt(false); }} className="py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 flex items-center justify-center gap-2">
+                             <Printer className="w-4 h-4" /> Print
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Catalog Area */}
+      <div className="lg:w-2/3 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 flex flex-col overflow-hidden">
+        {/* Search & Filter Header */}
+        <div className="p-5 border-b border-slate-100 bg-white sticky top-0 z-10 space-y-4">
+            <div className="relative">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <input 
+                    type="text" 
+                    placeholder="Scan Barcode or Search Product..." 
+                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-slate-700"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    autoFocus
+                />
+                <Barcode className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5 opacity-50" />
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                {categories.map(cat => (
+                    <button 
+                        key={cat}
+                        onClick={() => setActiveCategory(cat)}
+                        className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                            activeCategory === cat 
+                            ? 'bg-blue-600 text-white shadow-md' 
+                            : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        }`}
+                    >
+                        {cat}
+                    </button>
+                ))}
+            </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 bg-slate-50/30">
-          {filteredProducts.map(product => {
-            const allergyWarning = getWarnings(product);
-            return (
-                <div 
-                key={product.id} 
-                onClick={() => product.stock > 0 && addToCart(product)}
-                className={`bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-[0_10px_30px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden ${product.stock === 0 ? 'opacity-50 pointer-events-none' : ''}`}
-                >
-                {allergyWarning && (
-                    <div className="absolute top-0 left-0 right-0 bg-red-500 text-white text-[10px] py-1.5 px-2 text-center font-bold z-10 uppercase tracking-wide animate-pulse">
-                        ⚠️ Allergy Alert
-                    </div>
-                )}
-                {product.requiresPrescription && !allergyWarning && (
-                    <div className="absolute top-0 right-0 bg-blue-100 text-blue-800 text-[10px] py-1 px-3 rounded-bl-xl font-bold z-10 uppercase tracking-wide">
-                        Rx Only
-                    </div>
-                )}
-                
-                <div className="mb-4 relative">
-                    <div className="aspect-square bg-slate-50 rounded-xl flex items-center justify-center text-slate-300 relative mb-4 group-hover:bg-blue-50 transition-colors">
-                        <PackageIcon />
-                        {allergyWarning && <AlertTriangle className="absolute text-red-500 w-10 h-10 bg-white rounded-full p-2 shadow-lg top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />}
-                    </div>
-                    <div className="absolute top-2 left-2">
-                         <span className="bg-slate-800 text-white text-[9px] font-bold px-1.5 py-0.5 rounded opacity-50">{product.id}</span>
-                    </div>
-                    {product.stock <= product.minStock && product.stock > 0 && (
-                        <div className="absolute bottom-2 right-2">
-                             <span className="bg-orange-100 text-orange-600 text-[10px] font-bold px-2 py-1 rounded-full border border-orange-200">Low</span>
+        {/* Product Grid - E-commerce Style */}
+        <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5">
+            {filteredProducts.map(product => {
+                const allergyWarning = getWarnings(product);
+                return (
+                    <div 
+                        key={product.id} 
+                        onClick={() => product.stock > 0 && addToCart(product)}
+                        className={`bg-white rounded-xl shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer flex flex-col group overflow-hidden ${product.stock === 0 ? 'opacity-60 grayscale' : ''}`}
+                    >
+                        {/* Image / Icon Area */}
+                        <div className="aspect-[4/3] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center relative p-6">
+                            {product.image ? (
+                                <img src={product.image} alt={product.name} className="object-contain w-full h-full mix-blend-multiply" />
+                            ) : (
+                                <Pill className="w-12 h-12 text-slate-300 group-hover:text-blue-500 transition-colors" />
+                            )}
+                            
+                            {/* Badges */}
+                            {allergyWarning && (
+                                <div className="absolute top-2 left-2 right-2 bg-red-500 text-white text-[10px] py-1 px-2 rounded-md font-bold text-center shadow-sm animate-pulse">
+                                    ALLERGY WARNING
+                                </div>
+                            )}
+                            {product.requiresPrescription && !allergyWarning && (
+                                <div className="absolute top-2 right-2 bg-blue-600 text-white text-[10px] py-1 px-2 rounded-md font-bold shadow-sm">
+                                    Rx
+                                </div>
+                            )}
+                            {product.stock <= product.minStock && product.stock > 0 && (
+                                <div className="absolute bottom-2 left-2 bg-orange-500 text-white text-[10px] py-1 px-2 rounded-full font-bold shadow-sm">
+                                    Low Stock
+                                </div>
+                            )}
                         </div>
-                    )}
-                    <h3 className="font-bold text-slate-800 line-clamp-2 leading-tight h-10 group-hover:text-blue-600 transition-colors">{product.name}</h3>
-                    <p className="text-xs text-slate-500 mt-1">{product.genericName}</p>
-                </div>
-                
-                <div className="flex justify-between items-end mt-2">
-                    <div>
-                         <p className="text-[10px] text-slate-400">Price</p>
-                         <span className="font-bold text-lg text-blue-700">฿{product.price}</span>
+
+                        {/* Content */}
+                        <div className="p-4 flex flex-col flex-1">
+                            <div className="mb-2">
+                                <h3 className="font-bold text-slate-800 text-sm line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors">{product.name}</h3>
+                                <p className="text-xs text-slate-500 mt-1 truncate">{product.genericName}</p>
+                            </div>
+                            <div className="mt-auto flex justify-between items-end">
+                                <div>
+                                    <span className="block text-[10px] text-slate-400">Price</span>
+                                    <span className="font-bold text-lg text-blue-700">฿{product.price.toLocaleString()}</span>
+                                </div>
+                                <button className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-blue-600 hover:bg-blue-600 hover:text-white transition-colors">
+                                    <Plus className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <button className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 shadow-md shadow-blue-200 transition-transform active:scale-95">
-                        <Plus className="w-5 h-5" />
-                    </button>
-                </div>
-                </div>
-            );
-          })}
+                );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Cart & Checkout Area */}
-      <div className="lg:w-1/3 flex flex-col h-full">
-        <div className="bg-white rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-100 flex flex-col h-full overflow-hidden">
-            {/* Customer Section */}
-            <div className="p-5 border-b border-slate-100 bg-white">
-                <div className="flex items-center justify-between mb-3">
-                     <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <ShoppingBag className="text-blue-600 w-5 h-5" /> Current Sale
-                    </h2>
-                    <div className="text-xs font-medium text-slate-400">Order #{Date.now().toString().slice(-6)}</div>
-                </div>
-               
-                <div className="relative group">
-                    <select 
-                        className="w-full p-3.5 pl-11 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none appearance-none transition-all cursor-pointer font-medium text-slate-700"
-                        value={selectedCustomerId}
-                        onChange={(e) => setSelectedCustomerId(e.target.value)}
-                    >
-                        <option value="">General Customer (Walk-in)</option>
-                        {state.customers.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                    </select>
-                    <User className="absolute left-4 top-3.5 text-slate-400 w-5 h-5 group-hover:text-blue-500 transition-colors" />
-                </div>
-                
-                {selectedCustomer && (
-                    <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100/50">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <div className="text-sm font-bold text-blue-900">{selectedCustomer.name}</div>
-                                <div className="text-xs text-blue-600/70">{selectedCustomer.phone}</div>
-                            </div>
-                            <div className="text-right">
-                                <div className="text-xs font-semibold text-blue-400 uppercase">Points</div>
-                                <div className="text-lg font-bold text-blue-700">{selectedCustomer.points.toLocaleString()}</div>
-                            </div>
-                        </div>
-                        {selectedCustomer.allergies && selectedCustomer.allergies.length > 0 && (
-                            <div className="mt-3 text-xs bg-white text-red-600 py-2 px-3 rounded-lg border border-red-100 flex items-center gap-2 shadow-sm font-medium">
-                                <ShieldCheck className="w-4 h-4 shrink-0" /> 
-                                <span>ALLERGY: {selectedCustomer.allergies.join(', ')}</span>
-                            </div>
-                        )}
-                    </div>
-                )}
+      {/* Cart Section */}
+      <div className="lg:w-1/3 flex flex-col h-full bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 overflow-hidden relative z-20">
+        {/* Customer Header */}
+        <div className="p-5 border-b border-slate-100 bg-white">
+            <div className="relative mb-4">
+                <select 
+                    className="w-full p-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer"
+                    value={selectedCustomerId}
+                    onChange={(e) => setSelectedCustomerId(e.target.value)}
+                >
+                    <option value="">General Customer (Walk-in)</option>
+                    {state.customers.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                </select>
+                <User className="absolute left-3 top-3 text-slate-400 w-5 h-5 pointer-events-none" />
+                <ChevronRight className="absolute right-3 top-3 text-slate-400 w-5 h-5 pointer-events-none rotate-90" />
             </div>
+            
+            {selectedCustomer && (
+                <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="font-bold text-blue-900">{selectedCustomer.name}</div>
+                            <div className="text-xs text-blue-600">{selectedCustomer.phone}</div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-xs font-semibold text-blue-400">Points</div>
+                            <div className="font-bold text-blue-700">{selectedCustomer.points}</div>
+                        </div>
+                    </div>
+                    {selectedCustomer.allergies && selectedCustomer.allergies.length > 0 && (
+                        <div className="mt-3 flex items-start gap-2 text-xs bg-white p-2 rounded-lg text-red-600 border border-red-100 shadow-sm">
+                            <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" /> 
+                            <span className="font-bold">ALLERGY: {selectedCustomer.allergies.join(', ')}</span>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
 
-            {/* Cart Items */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30">
+        {/* Cart List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
             {cart.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-300">
-                    <ShoppingBag size={64} className="mb-4 opacity-20" />
-                    <p className="font-medium">Scan or select items</p>
+                    <ShoppingBag size={48} className="mb-4 opacity-20" />
+                    <p className="font-medium text-sm">Cart is empty</p>
+                    <p className="text-xs">Scan items to begin</p>
                 </div>
             ) : (
                 <>
                     {needsPrescription && (
-                        <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-3 flex items-start gap-3 mb-2 animate-pulse">
-                            <Stethoscope className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex gap-3 animate-fade-in">
+                            <div className="bg-yellow-100 p-2 rounded-lg h-fit">
+                                <Stethoscope className="w-5 h-5 text-yellow-700" />
+                            </div>
                             <div>
-                                <div className="text-xs font-bold text-yellow-700 uppercase">Pharmacist Required</div>
-                                <div className="text-[10px] text-yellow-600">This order contains Rx items. Please verify prescription.</div>
+                                <h4 className="text-sm font-bold text-yellow-800">Prescription Required</h4>
+                                <p className="text-xs text-yellow-700 mt-1">รายการยานี้ต้องได้รับการอนุมัติโดยเภสัชกร</p>
                             </div>
                         </div>
                     )}
                     {cart.map(item => (
-                    <div key={item.id} className="flex justify-between items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
-                        {item.requiresPrescription && <div className="absolute left-0 top-0 bottom-0 w-1 bg-yellow-400"></div>}
-                        <div className="flex-1 mr-4 ml-2">
-                        <h4 className="font-bold text-slate-800 text-sm line-clamp-1">{item.name}</h4>
-                        <p className="text-xs text-slate-500 mt-0.5">฿{item.price} / {item.unit}</p>
+                        <div key={item.id} className="flex justify-between items-center p-2 hover:bg-slate-50 rounded-xl transition-colors group">
+                            <div className="flex-1 pr-4">
+                                <div className="flex items-center gap-2">
+                                    <h4 className="font-bold text-slate-700 text-sm line-clamp-1">{item.name}</h4>
+                                    {item.requiresPrescription && <span className="bg-blue-100 text-blue-700 text-[9px] px-1.5 rounded font-bold">Rx</span>}
+                                </div>
+                                <div className="text-xs text-slate-500 mt-1">฿{item.price} x {item.quantity}</div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="font-bold text-slate-900 w-16 text-right">฿{(item.price * item.quantity).toLocaleString()}</span>
+                                <div className="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm">
+                                    <button onClick={() => updateQuantity(item.id, -1)} className="p-1 hover:bg-slate-100 rounded-l-lg text-slate-500"><Minus className="w-3 h-3" /></button>
+                                    <button onClick={() => updateQuantity(item.id, 1)} className="p-1 hover:bg-slate-100 rounded-r-lg text-slate-500"><Plus className="w-3 h-3" /></button>
+                                </div>
+                                <button onClick={() => removeFromCart(item.id)} className="text-slate-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex items-center space-x-3">
-                        <div className="flex items-center bg-slate-50 rounded-full border border-slate-200 p-0.5">
-                            <button onClick={() => updateQuantity(item.id, -1)} className="w-7 h-7 flex items-center justify-center bg-white rounded-full shadow-sm hover:text-blue-600 transition-colors"><Minus className="w-3 h-3" /></button>
-                            <span className="w-8 text-center text-sm font-bold text-slate-700">{item.quantity}</span>
-                            <button onClick={() => updateQuantity(item.id, 1)} className="w-7 h-7 flex items-center justify-center bg-white rounded-full shadow-sm hover:text-blue-600 transition-colors"><Plus className="w-3 h-3" /></button>
-                        </div>
-                        <button onClick={() => removeFromCart(item.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1">
-                            <Trash2 className="w-4 h-4" />
-                        </button>
-                        </div>
-                    </div>
                     ))}
                 </>
             )}
-            </div>
+        </div>
 
-            {/* Total & Payment */}
-            <div className="p-6 bg-white border-t border-slate-100 rounded-b-3xl">
+        {/* Totals & Pay */}
+        <div className="p-6 bg-slate-50 border-t border-slate-200">
             <div className="flex justify-between items-end mb-6">
-                <div>
-                    <span className="text-slate-500 font-medium text-sm">Subtotal</span>
-                    <div className="text-xs text-slate-400 mt-1">{cart.reduce((a,c) => a + c.quantity, 0)} items</div>
-                </div>
-                <span className="text-4xl font-bold text-slate-900 tracking-tight">฿{cartTotal.toLocaleString()}</span>
+                <span className="text-slate-500 text-sm font-medium">Net Total</span>
+                <span className="text-3xl font-bold text-slate-900 tracking-tight">฿{cartTotal.toLocaleString()}</span>
             </div>
             
             <div className="grid grid-cols-3 gap-3">
-                <button 
-                    onClick={() => handleCheckout('CASH')}
-                    disabled={cart.length === 0}
-                    className="flex flex-col items-center justify-center p-3 bg-slate-50 border border-slate-200 rounded-xl hover:border-green-500 hover:bg-green-50 hover:text-green-700 transition-all disabled:opacity-50 group"
-                >
-                    <Banknote className="w-6 h-6 mb-1 text-slate-400 group-hover:text-green-600" />
-                    <span className="text-xs font-bold">Cash</span>
-                </button>
-                <button 
-                    onClick={() => handleCheckout('QR')}
-                    disabled={cart.length === 0}
-                    className="flex flex-col items-center justify-center p-3 bg-slate-50 border border-slate-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700 transition-all disabled:opacity-50 group"
-                >
-                    <QrCode className="w-6 h-6 mb-1 text-slate-400 group-hover:text-blue-600" />
-                    <span className="text-xs font-bold">Scan</span>
-                </button>
-                <button 
-                    onClick={() => handleCheckout('CREDIT')}
-                    disabled={cart.length === 0}
-                    className="flex flex-col items-center justify-center p-3 bg-slate-50 border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 hover:text-indigo-700 transition-all disabled:opacity-50 group"
-                >
-                    <CreditCard className="w-6 h-6 mb-1 text-slate-400 group-hover:text-indigo-600" />
-                    <span className="text-xs font-bold">Card</span>
-                </button>
-            </div>
+                {[
+                    { id: 'CASH', label: 'Cash', icon: Banknote, color: 'green' },
+                    { id: 'QR', label: 'QR Scan', icon: QrCode, color: 'blue' },
+                    { id: 'CREDIT', label: 'Card', icon: CreditCard, color: 'indigo' }
+                ].map((m) => (
+                    <button 
+                        key={m.id}
+                        onClick={() => handleCheckout(m.id as any)}
+                        disabled={cart.length === 0}
+                        className={`flex flex-col items-center justify-center p-4 bg-white border border-slate-200 rounded-xl hover:border-${m.color}-500 hover:shadow-md transition-all disabled:opacity-50 disabled:hover:shadow-none group`}
+                    >
+                        <m.icon className={`w-6 h-6 mb-2 text-slate-400 group-hover:text-${m.color}-600 transition-colors`} />
+                        <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900">{m.label}</span>
+                    </button>
+                ))}
             </div>
         </div>
       </div>
     </div>
   );
 };
-
-const PackageIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-package w-12 h-12 text-slate-200"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
-);
 
 export default POS;

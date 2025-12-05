@@ -14,19 +14,34 @@ export interface Batch {
   costPrice: number;
 }
 
+export interface StockLog {
+  id: string;
+  date: string;
+  productId: string;
+  productName: string;
+  action: 'SALE' | 'RECEIVE' | 'ADJUST' | 'RETURN';
+  quantity: number;
+  staffName: string;
+  note?: string;
+  batchId?: string;
+}
+
 export interface Product {
   id: string;
+  barcode: string; // Critical for POS
   name: string;
   genericName: string;
   category: ProductCategory;
+  manufacturer: string;
+  location: string; // Warehouse Zone e.g., A1-02
   price: number;
-  cost: number; // Average cost
-  stock: number; // Total stock across batches
+  cost: number; // Moving Average Cost
+  stock: number; // Total stock
   minStock: number;
   unit: string;
-  batches: Batch[]; // Added for GPP Compliance
+  batches: Batch[];
   image?: string;
-  requiresPrescription?: boolean; // New: GPP Requirement
+  requiresPrescription?: boolean;
 }
 
 export interface Customer {
@@ -36,7 +51,7 @@ export interface Customer {
   points: number;
   totalSpent: number;
   lastVisit: string;
-  allergies?: string[]; // Critical for pharmacy
+  allergies?: string[];
 }
 
 export interface CartItem extends Product {
@@ -50,7 +65,7 @@ export interface SaleRecord {
   items: CartItem[];
   total: number;
   paymentMethod: 'CASH' | 'QR' | 'CREDIT';
-  branchId: string; // New: Multi-branch support
+  branchId: string;
 }
 
 export interface Supplier {
@@ -58,17 +73,28 @@ export interface Supplier {
   name: string;
   contactPerson: string;
   phone: string;
+  email: string;
+  address: string;
   creditTerm: number; // Days
+  rating: number; // 1-5
+}
+
+export interface POItem {
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitCost: number;
 }
 
 export interface PurchaseOrder {
   id: string;
+  supplierId: string;
   supplierName: string;
   date: string;
   dueDate: string;
   status: 'PENDING' | 'APPROVED' | 'RECEIVED' | 'CANCELLED';
+  items: POItem[];
   totalAmount: number;
-  itemsCount: number;
   paymentStatus: 'UNPAID' | 'PAID';
 }
 
@@ -92,6 +118,8 @@ export interface GlobalState {
   customers: Customer[];
   sales: SaleRecord[];
   purchaseOrders: PurchaseOrder[];
+  suppliers: Supplier[];
+  stockLogs: StockLog[];
   expenses: Expense[];
   currentBranch: Branch;
   branches: Branch[];
@@ -99,8 +127,9 @@ export interface GlobalState {
 
 export type Action =
   | { type: 'ADD_SALE'; payload: SaleRecord }
-  | { type: 'UPDATE_STOCK'; payload: { productId: string; quantity: number } }
+  | { type: 'UPDATE_STOCK'; payload: { productId: string; quantity: number; note: string } }
   | { type: 'ADD_CUSTOMER'; payload: Customer }
   | { type: 'UPDATE_CUSTOMER_POINTS'; payload: { customerId: string; points: number; spent: number } }
   | { type: 'ADD_PO'; payload: PurchaseOrder }
+  | { type: 'RECEIVE_PO'; payload: { poId: string; receivedDate: string } } // ERP Key Feature
   | { type: 'SWITCH_BRANCH'; payload: string };

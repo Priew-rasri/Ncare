@@ -1,5 +1,5 @@
 
-import { Product, ProductCategory, Customer, PurchaseOrder, SaleRecord, Expense, Branch } from './types';
+import { Product, ProductCategory, Customer, PurchaseOrder, SaleRecord, Expense, Branch, Supplier, StockLog } from './types';
 
 export const MOCK_BRANCHES: Branch[] = [
     { id: 'B001', name: 'สาขาใหญ่ (Headquarters)', location: 'Siam Square', type: 'HQ' },
@@ -7,12 +7,21 @@ export const MOCK_BRANCHES: Branch[] = [
     { id: 'B003', name: 'สาขาบางนา', location: 'Bangna', type: 'BRANCH' },
 ];
 
+export const MOCK_SUPPLIERS: Supplier[] = [
+    { id: 'S001', name: 'บ. ยาไทย จำกัด (Thai Pharma)', contactPerson: 'คุณวิชัย', phone: '02-123-4567', email: 'sales@thaipharma.com', address: 'Bangkok', creditTerm: 30, rating: 4.5 },
+    { id: 'S002', name: 'Zuellig Pharma', contactPerson: 'Sales Support', phone: '02-999-8888', email: 'support@zuellig.com', address: 'Bangkok', creditTerm: 45, rating: 5.0 },
+    { id: 'S003', name: 'DKSH Thailand', contactPerson: 'Call Center', phone: '02-777-6666', email: 'orders@dksh.com', address: 'Samut Prakan', creditTerm: 60, rating: 4.8 },
+];
+
 export const MOCK_INVENTORY: Product[] = [
   {
     id: 'P001',
+    barcode: '8850123456789',
     name: 'Sara (Paracetamol 500mg)',
     genericName: 'Paracetamol',
     category: ProductCategory.HOUSEHOLD,
+    manufacturer: 'Thai Nakorn Patana',
+    location: 'A1-01',
     price: 15,
     cost: 8,
     stock: 120,
@@ -26,9 +35,12 @@ export const MOCK_INVENTORY: Product[] = [
   },
   {
     id: 'P002',
+    barcode: '8850987654321',
     name: 'Amoxy (Amoxicillin 500mg)',
     genericName: 'Amoxicillin',
     category: ProductCategory.MEDICINE,
+    manufacturer: 'Siam Pharma',
+    location: 'B2-05',
     price: 80,
     cost: 45,
     stock: 45,
@@ -41,9 +53,12 @@ export const MOCK_INVENTORY: Product[] = [
   },
   {
     id: 'P003',
+    barcode: '8850111222333',
     name: 'Vitamin C 1000mg Bio-C',
     genericName: 'Ascorbic Acid',
     category: ProductCategory.SUPPLEMENT,
+    manufacturer: 'Blackmores',
+    location: 'C1-12',
     price: 350,
     cost: 200,
     stock: 20,
@@ -56,9 +71,12 @@ export const MOCK_INVENTORY: Product[] = [
   },
   {
     id: 'P004',
+    barcode: '8850555666777',
     name: 'N-95 Mask',
     genericName: 'Protective Mask',
     category: ProductCategory.EQUIPMENT,
+    manufacturer: '3M',
+    location: 'D4-01',
     price: 25,
     cost: 10,
     stock: 500,
@@ -71,9 +89,12 @@ export const MOCK_INVENTORY: Product[] = [
   },
   {
     id: 'P005',
+    barcode: '8850888999000',
     name: 'Alcohol Gel 75%',
     genericName: 'Ethyl Alcohol',
     category: ProductCategory.HOUSEHOLD,
+    manufacturer: 'GPO',
+    location: 'A2-03',
     price: 55,
     cost: 30,
     stock: 8,
@@ -86,9 +107,12 @@ export const MOCK_INVENTORY: Product[] = [
   },
   {
     id: 'P006',
+    barcode: '8850444333222',
     name: 'Ezerra Cream',
     genericName: 'Moisturizer',
     category: ProductCategory.COSMETIC,
+    manufacturer: 'Hoe Pharma',
+    location: 'C2-08',
     price: 750,
     cost: 500,
     stock: 15,
@@ -108,17 +132,42 @@ export const MOCK_CUSTOMERS: Customer[] = [
 ];
 
 export const MOCK_PO: PurchaseOrder[] = [
-  { id: 'PO-24001', supplierName: 'บ. ยาไทย จำกัด', date: '2024-05-01', dueDate: '2024-05-30', status: 'RECEIVED', totalAmount: 15000, itemsCount: 500, paymentStatus: 'PAID' },
-  { id: 'PO-24002', supplierName: 'Zuellig Pharma', date: '2024-05-15', dueDate: '2024-06-15', status: 'PENDING', totalAmount: 8500, itemsCount: 120, paymentStatus: 'UNPAID' },
-  { id: 'PO-24003', supplierName: 'DKSH Thailand', date: '2024-05-25', dueDate: '2024-06-25', status: 'APPROVED', totalAmount: 42000, itemsCount: 350, paymentStatus: 'UNPAID' },
+  { 
+      id: 'PO-24001', 
+      supplierId: 'S001', 
+      supplierName: 'บ. ยาไทย จำกัด', 
+      date: '2024-05-01', 
+      dueDate: '2024-05-30', 
+      status: 'RECEIVED', 
+      totalAmount: 15000, 
+      paymentStatus: 'PAID',
+      items: [
+          { productId: 'P001', productName: 'Sara (Paracetamol)', quantity: 1000, unitCost: 7.5 }
+      ]
+  },
+  { 
+      id: 'PO-24002', 
+      supplierId: 'S002', 
+      supplierName: 'Zuellig Pharma', 
+      date: '2024-05-15', 
+      dueDate: '2024-06-15', 
+      status: 'PENDING', 
+      totalAmount: 8500, 
+      paymentStatus: 'UNPAID',
+      items: [
+          { productId: 'P002', productName: 'Amoxy', quantity: 200, unitCost: 42.5 }
+      ]
+  },
 ];
 
 export const MOCK_SALES: SaleRecord[] = [
   { id: 'INV-0001', date: '2024-05-24', total: 450, paymentMethod: 'QR', items: [], branchId: 'B001' },
   { id: 'INV-0002', date: '2024-05-24', total: 120, paymentMethod: 'CASH', items: [], branchId: 'B001' },
-  { id: 'INV-0003', date: '2024-05-23', total: 1250, paymentMethod: 'CREDIT', items: [], branchId: 'B002' },
-  { id: 'INV-0004', date: '2024-05-23', total: 80, paymentMethod: 'CASH', items: [], branchId: 'B001' },
-  { id: 'INV-0005', date: '2024-05-22', total: 3200, paymentMethod: 'QR', items: [], branchId: 'B003' },
+];
+
+export const MOCK_STOCK_LOGS: StockLog[] = [
+    { id: 'LOG-001', date: '2024-05-24 10:30', productId: 'P001', productName: 'Sara', action: 'SALE', quantity: -2, staffName: 'Admin' },
+    { id: 'LOG-002', date: '2024-05-23 14:00', productId: 'P002', productName: 'Amoxy', action: 'RECEIVE', quantity: 50, staffName: 'Admin', note: 'From PO-24000' },
 ];
 
 export const MOCK_EXPENSES: Expense[] = [

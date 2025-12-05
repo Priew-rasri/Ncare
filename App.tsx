@@ -7,17 +7,29 @@ import Inventory from './components/Inventory';
 import CRM from './components/CRM';
 import Accounting from './components/Accounting';
 import AIAssistant from './components/AIAssistant';
-import { MOCK_INVENTORY, MOCK_CUSTOMERS, MOCK_SALES, MOCK_PO, MOCK_EXPENSES, MOCK_BRANCHES } from './constants';
-import { GlobalState, Action } from './types';
-import { Search, Bell, MapPin, ChevronDown } from 'lucide-react';
+import { MOCK_INVENTORY, MOCK_CUSTOMERS, MOCK_SALES, MOCK_PO, MOCK_EXPENSES, MOCK_BRANCHES, MOCK_SUPPLIERS, MOCK_STOCK_LOGS } from './constants';
+import { GlobalState, Action, StockLog } from './types';
+import { Search, Bell, MapPin, ChevronDown, Menu } from 'lucide-react';
 
 // Reducer
 const reducer = (state: GlobalState, action: Action): GlobalState => {
   switch (action.type) {
     case 'ADD_SALE':
+        // Log movement
+        const newLogs: StockLog[] = action.payload.items.map(item => ({
+            id: `LOG-${Date.now()}-${Math.random()}`,
+            date: new Date().toLocaleString(),
+            productId: item.id,
+            productName: item.name,
+            action: 'SALE',
+            quantity: -item.quantity,
+            staffName: 'Sales Staff'
+        }));
+
       return {
         ...state,
-        sales: [action.payload, ...state.sales]
+        sales: [action.payload, ...state.sales],
+        stockLogs: [...newLogs, ...state.stockLogs]
       };
     case 'UPDATE_STOCK':
       return {
@@ -42,6 +54,53 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             ...state,
             purchaseOrders: [action.payload, ...state.purchaseOrders]
         };
+    case 'RECEIVE_PO':
+        const po = state.purchaseOrders.find(p => p.id === action.payload.poId);
+        if (!po || po.status === 'RECEIVED') return state;
+
+        // 1. Update PO Status
+        const updatedPOs = state.purchaseOrders.map(p => 
+            p.id === action.payload.poId ? { ...p, status: 'RECEIVED' as const } : p
+        );
+
+        // 2. Add Items to Inventory (Generate new Batches)
+        const updatedInventory = state.inventory.map(product => {
+            const poItem = po.items.find(i => i.productId === product.id);
+            if (poItem) {
+                const newBatch = {
+                    lotNumber: `LOT-${Date.now().toString().substr(-6)}`,
+                    expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0], // Mock 2 year expiry
+                    quantity: poItem.quantity,
+                    costPrice: poItem.unitCost
+                };
+                return {
+                    ...product,
+                    stock: product.stock + poItem.quantity,
+                    batches: [...product.batches, newBatch]
+                };
+            }
+            return product;
+        });
+
+        // 3. Create Logs
+        const receiveLogs: StockLog[] = po.items.map(item => ({
+            id: `LOG-${Date.now()}-${item.productId}`,
+            date: new Date().toLocaleString(),
+            productId: item.productId,
+            productName: item.productName,
+            action: 'RECEIVE',
+            quantity: item.quantity,
+            staffName: 'Warehouse Mgr',
+            note: `Received from ${po.id}`
+        }));
+
+        return {
+            ...state,
+            purchaseOrders: updatedPOs,
+            inventory: updatedInventory,
+            stockLogs: [...receiveLogs, ...state.stockLogs]
+        };
+
     case 'SWITCH_BRANCH':
         const newBranch = state.branches.find(b => b.id === action.payload);
         return newBranch ? { ...state, currentBranch: newBranch } : state;
@@ -55,6 +114,8 @@ const initialState: GlobalState = {
   customers: MOCK_CUSTOMERS,
   sales: MOCK_SALES,
   purchaseOrders: MOCK_PO,
+  suppliers: MOCK_SUPPLIERS,
+  stockLogs: MOCK_STOCK_LOGS,
   expenses: MOCK_EXPENSES,
   branches: MOCK_BRANCHES,
   currentBranch: MOCK_BRANCHES[0]
@@ -71,11 +132,11 @@ const App: React.FC = () => {
       case 'pos':
         return <POS state={state} dispatch={dispatch} />;
       case 'inventory':
-        return <Inventory data={state} />;
+        return <Inventory data={state} dispatch={dispatch} />;
       case 'crm':
         return <CRM data={state} />;
       case 'accounting':
-        return <Accounting data={state} />;
+        return <Accounting data={state} dispatch={dispatch} />;
       case 'ai-assistant':
         return <AIAssistant data={state} />;
       default:
@@ -84,26 +145,35 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#f8fafc] font-sans text-slate-900">
+    <div className="flex min-h-screen bg-[#f3f4f6] font-sans text-slate-900">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
-      <main className="flex-1 ml-64 flex flex-col h-screen overflow-hidden">
+      <main className="flex-1 ml-72 flex flex-col h-screen overflow-hidden">
         {/* Modern White Sticky Header */}
-        <header className="bg-white/80 backdrop-blur-md px-8 py-4 flex justify-between items-center border-b border-slate-100 sticky top-0 z-20">
+        <header className="bg-white px-8 py-4 flex justify-between items-center border-b border-slate-100 sticky top-0 z-20 shadow-sm">
             <div className="flex flex-col">
-                <h1 className="text-xl font-bold text-slate-800 capitalize tracking-tight">{activeTab === 'ai-assistant' ? 'AI Strategic Assistant' : activeTab}</h1>
-                <p className="text-xs text-slate-400 font-medium">{new Date().toLocaleDateString('th-TH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                <h1 className="text-xl font-bold text-slate-800 capitalize tracking-tight flex items-center gap-2">
+                    {activeTab === 'ai-assistant' ? 'AI Strategic Assistant' : activeTab}
+                </h1>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
             </div>
             
             <div className="flex items-center gap-6">
+                 {/* Search Bar */}
+                 <div className="hidden lg:flex items-center bg-slate-50 border border-slate-200 rounded-full px-4 py-2.5 w-64 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                    <Search className="w-4 h-4 text-slate-400 mr-2" />
+                    <input type="text" placeholder="Global Search..." className="bg-transparent border-none text-sm focus:outline-none w-full text-slate-700" />
+                 </div>
+
                  {/* Branch Selector (Enterprise Feature) */}
                  <div className="relative group hidden lg:block">
-                     <button className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-4 py-2 rounded-full text-sm font-bold text-slate-700 hover:bg-slate-100 hover:border-slate-300 transition-all">
-                        <MapPin className="w-4 h-4 text-blue-500" />
+                     <button className="flex items-center gap-2 bg-white border border-slate-200 px-4 py-2.5 rounded-full text-sm font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm">
+                        <MapPin className="w-4 h-4 text-blue-600" />
                         <span>{state.currentBranch.name}</span>
-                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                        <ChevronDown className="w-3 h-3 text-slate-400" />
                      </button>
-                     <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-slate-100 overflow-hidden hidden group-hover:block animate-fade-in z-50">
+                     <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-slate-100 overflow-hidden hidden group-hover:block animate-fade-in z-50">
+                        <div className="p-3 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Switch Branch</div>
                         {state.branches.map(branch => (
                             <button 
                                 key={branch.id}
@@ -118,17 +188,13 @@ const App: React.FC = () => {
                  </div>
 
                  <div className="flex items-center gap-4 border-l border-slate-100 pl-6">
-                    <button className="relative p-2 text-slate-400 hover:text-blue-600 transition-colors">
+                    <button className="relative p-2 text-slate-400 hover:text-blue-600 transition-colors hover:bg-blue-50 rounded-full">
                         <Bell className="w-5 h-5" />
-                        <span className="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                        <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
                     </button>
-                    <div className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 p-1.5 pr-3 rounded-full transition-all group">
-                        <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-md shadow-blue-200 group-hover:scale-105 transition-transform">
+                    <div className="flex items-center gap-3 cursor-pointer p-1 rounded-full transition-all group">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-bold shadow-md shadow-blue-200">
                              S
-                        </div>
-                        <div className="flex flex-col items-start hidden lg:flex">
-                            <span className="text-sm font-bold text-slate-700 leading-none group-hover:text-blue-600 transition-colors">Somying.P</span>
-                            <span className="text-[10px] text-blue-500 font-bold mt-1">Pharmacist (Admin)</span>
                         </div>
                     </div>
                  </div>
@@ -136,8 +202,10 @@ const App: React.FC = () => {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 p-8 overflow-y-auto bg-[#f8fafc]">
-             {renderContent()}
+        <div className="flex-1 p-6 overflow-y-auto bg-[#f3f4f6]">
+             <div className="max-w-7xl mx-auto">
+                {renderContent()}
+             </div>
         </div>
       </main>
     </div>
