@@ -1,7 +1,8 @@
 
+
 import React, { useState } from 'react';
 import { GlobalState, PurchaseOrder } from '../types';
-import { FileText, CheckCircle, Clock, XCircle, TrendingUp, TrendingDown, DollarSign, Calendar, AlertCircle, Printer, Users, Truck, Phone, Box, Plus, X, ShoppingCart, Percent } from 'lucide-react';
+import { FileText, CheckCircle, Clock, XCircle, TrendingUp, TrendingDown, DollarSign, Calendar, AlertCircle, Printer, Users, Truck, Phone, Box, Plus, X, ShoppingCart, Percent, FileBarChart, Wallet, Download } from 'lucide-react';
 
 interface AccountingProps {
     data: GlobalState;
@@ -9,12 +10,15 @@ interface AccountingProps {
 }
 
 const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
-    const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'PO' | 'SUPPLIER' | 'EXPENSE'>('OVERVIEW');
+    const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'PO' | 'SUPPLIER' | 'EXPENSE' | 'REPORT' | 'CASH'>('OVERVIEW');
     const [showPOModal, setShowPOModal] = useState(false);
     
     // New PO Form State
     const [newPOSupplier, setNewPOSupplier] = useState('');
     
+    // Report Preview State
+    const [previewReport, setPreviewReport] = useState<'TAX' | 'SALES' | null>(null);
+
     const totalRevenue = data.sales.reduce((acc, curr) => acc + curr.total, 0);
     const totalExpenses = data.expenses.reduce((acc, curr) => acc + curr.amount, 0);
     
@@ -30,7 +34,7 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
     const TabButton = ({ id, label }: { id: string, label: string }) => (
         <button 
             onClick={() => setActiveTab(id as any)}
-            className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 ${
+            className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 whitespace-nowrap ${
                 activeTab === id 
                 ? 'bg-blue-600 text-white shadow-md' 
                 : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
@@ -305,6 +309,145 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
          </div>
     );
 
+    const renderReports = () => (
+        <div className="space-y-6 animate-fade-in">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 {/* Tax Report Card */}
+                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all cursor-pointer group" onClick={() => setPreviewReport('TAX')}>
+                     <div className="bg-purple-50 w-12 h-12 rounded-xl flex items-center justify-center text-purple-600 mb-4 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                         <FileText className="w-6 h-6" />
+                     </div>
+                     <h3 className="font-bold text-slate-800 text-lg">VAT Report (P.P.30)</h3>
+                     <p className="text-sm text-slate-500 mt-2">Generate monthly Input/Output VAT report for tax filing compliance.</p>
+                     <div className="mt-4 text-xs font-bold text-blue-600 flex items-center gap-1">
+                         Generate Preview <TrendingUp className="w-3 h-3" />
+                     </div>
+                 </div>
+
+                 {/* Sales Report Card */}
+                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all cursor-pointer group" onClick={() => setPreviewReport('SALES')}>
+                     <div className="bg-blue-50 w-12 h-12 rounded-xl flex items-center justify-center text-blue-600 mb-4 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                         <FileBarChart className="w-6 h-6" />
+                     </div>
+                     <h3 className="font-bold text-slate-800 text-lg">Daily Sales Summary</h3>
+                     <p className="text-sm text-slate-500 mt-2">Detailed breakdown of sales by category, payment method, and profit margins.</p>
+                     <div className="mt-4 text-xs font-bold text-blue-600 flex items-center gap-1">
+                         Generate Preview <TrendingUp className="w-3 h-3" />
+                     </div>
+                 </div>
+             </div>
+
+             {/* Report Preview Modal (In-place) */}
+             {previewReport && (
+                 <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 overflow-hidden animate-fade-in mt-6">
+                     <div className="p-4 bg-slate-800 text-white flex justify-between items-center">
+                         <div className="flex items-center gap-2">
+                             <Printer className="w-5 h-5" />
+                             <span className="font-bold">Print Preview: {previewReport === 'TAX' ? 'Tax Report (Output VAT)' : 'Sales Summary'}</span>
+                         </div>
+                         <button onClick={() => setPreviewReport(null)} className="hover:bg-slate-700 p-1 rounded"><X className="w-5 h-5" /></button>
+                     </div>
+                     <div className="p-8 font-mono text-sm bg-slate-50">
+                         {/* Header */}
+                         <div className="text-center mb-6">
+                             <h2 className="font-bold text-xl text-slate-900">{data.settings.storeName}</h2>
+                             <p className="text-slate-500">{data.settings.address} (Tax ID: {data.settings.taxId})</p>
+                             <h3 className="font-bold text-slate-800 mt-4 border-b border-slate-300 inline-block pb-1">
+                                 {previewReport === 'TAX' ? 'รายงานภาษีขาย (Output Tax Report)' : 'รายงานยอดขายประจำวัน (Daily Sales Report)'}
+                             </h3>
+                             <p className="text-xs text-slate-500 mt-1">Period: {new Date().toLocaleDateString('en-US', {month: 'long', year: 'numeric'})}</p>
+                         </div>
+                         
+                         {/* Table Content */}
+                         <table className="w-full text-left border-collapse">
+                             <thead>
+                                 <tr className="border-b-2 border-slate-300">
+                                     <th className="py-2">Date</th>
+                                     <th className="py-2">Doc No.</th>
+                                     <th className="py-2 text-right">Gross Value</th>
+                                     <th className="py-2 text-right">VAT (7%)</th>
+                                     <th className="py-2 text-right">Net Value</th>
+                                 </tr>
+                             </thead>
+                             <tbody>
+                                 {data.sales.slice(0, 10).map((sale) => (
+                                     <tr key={sale.id} className="border-b border-slate-200 text-slate-600">
+                                         <td className="py-2">{sale.date.split(' ')[0]}</td>
+                                         <td className="py-2">{sale.id}</td>
+                                         <td className="py-2 text-right">{sale.subtotalVatable.toFixed(2)}</td>
+                                         <td className="py-2 text-right">{sale.vatAmount.toFixed(2)}</td>
+                                         <td className="py-2 text-right">{(sale.subtotalVatable + sale.vatAmount).toFixed(2)}</td>
+                                     </tr>
+                                 ))}
+                             </tbody>
+                             <tfoot>
+                                 <tr className="border-t-2 border-slate-300 font-bold text-slate-900">
+                                     <td colSpan={2} className="py-3 text-right">Total:</td>
+                                     <td className="py-3 text-right">{data.sales.slice(0,10).reduce((a,c)=>a+c.subtotalVatable,0).toFixed(2)}</td>
+                                     <td className="py-3 text-right">{data.sales.slice(0,10).reduce((a,c)=>a+c.vatAmount,0).toFixed(2)}</td>
+                                     <td className="py-3 text-right">{data.sales.slice(0,10).reduce((a,c)=>a+(c.subtotalVatable+c.vatAmount),0).toFixed(2)}</td>
+                                 </tr>
+                             </tfoot>
+                         </table>
+                         
+                         <div className="mt-8 text-center">
+                             <button className="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 mx-auto hover:bg-slate-800 transition-colors">
+                                 <Printer className="w-4 h-4" /> Print Document
+                             </button>
+                         </div>
+                     </div>
+                 </div>
+             )}
+        </div>
+    );
+
+    const renderCashDrawer = () => (
+        <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 overflow-hidden animate-fade-in">
+             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                 <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                     <Wallet className="w-5 h-5 text-slate-400" /> Shift & Cash History
+                 </h3>
+                 <button className="text-slate-500 hover:text-blue-600 font-bold text-sm flex items-center gap-1">
+                     <Download className="w-4 h-4" /> Export CSV
+                 </button>
+             </div>
+             <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase text-slate-500">
+                    <tr>
+                         <th className="px-6 py-5 font-bold tracking-wider">Shift ID</th>
+                         <th className="px-6 py-5 font-bold tracking-wider">Staff</th>
+                         <th className="px-6 py-5 font-bold tracking-wider">Time Open/Close</th>
+                         <th className="px-6 py-5 font-bold tracking-wider text-right">Total Sales</th>
+                         <th className="px-6 py-5 font-bold tracking-wider text-right">Variance</th>
+                         <th className="px-6 py-5 font-bold tracking-wider text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                    {data.shiftHistory.map(shift => {
+                        const variance = (shift.actualCash || 0) - (shift.expectedCash || 0);
+                        return (
+                            <tr key={shift.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-6 py-5 text-blue-600 font-bold font-mono text-xs">{shift.id}</td>
+                                <td className="px-6 py-5 font-bold text-slate-800">{shift.staffName}</td>
+                                <td className="px-6 py-5">
+                                    <div className="text-xs text-slate-500">{shift.startTime}</div>
+                                    <div className="text-xs text-slate-500">{shift.endTime}</div>
+                                </td>
+                                <td className="px-6 py-5 text-right font-bold text-slate-800">฿{shift.totalSales.toLocaleString()}</td>
+                                <td className={`px-6 py-5 text-right font-bold ${variance < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                    {variance > 0 ? '+' : ''}{variance.toLocaleString()}
+                                </td>
+                                <td className="px-6 py-5 text-center">
+                                    <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-[10px] font-bold">CLOSED</span>
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+             </table>
+         </div>
+    );
+
     return (
         <div className="space-y-8 animate-fade-in pb-10 relative">
             {/* Create PO Modal */}
@@ -370,9 +513,11 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
                 </div>
                 <div className="flex bg-white p-1 rounded-full border border-slate-200 shadow-sm overflow-x-auto">
                     <TabButton id="OVERVIEW" label="Overview" />
-                    <TabButton id="PO" label="Purchase Orders" />
+                    <TabButton id="PO" label="Orders (PO)" />
                     <TabButton id="SUPPLIER" label="Suppliers" />
                     <TabButton id="EXPENSE" label="Expenses" />
+                    <TabButton id="REPORT" label="Reports" />
+                    <TabButton id="CASH" label="Cash & Shifts" />
                 </div>
             </div>
 
@@ -380,6 +525,8 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
             {activeTab === 'PO' && renderPO()}
             {activeTab === 'SUPPLIER' && renderSuppliers()}
             {activeTab === 'EXPENSE' && renderExpense()}
+            {activeTab === 'REPORT' && renderReports()}
+            {activeTab === 'CASH' && renderCashDrawer()}
         </div>
     );
 };

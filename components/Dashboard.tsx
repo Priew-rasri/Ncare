@@ -1,5 +1,6 @@
 
-import React from 'react';
+
+import React, { useMemo } from 'react';
 import { 
   BarChart, 
   Bar, 
@@ -9,34 +10,85 @@ import {
   Tooltip, 
   ResponsiveContainer,
   AreaChart,
-  Area
+  Area,
+  PieChart,
+  Pie,
+  Cell
 } from 'recharts';
 import { GlobalState } from '../types';
-import { ArrowUpRight, ArrowDownRight, Users, DollarSign, PackageCheck, AlertTriangle, Filter, Clock } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Users, DollarSign, PackageCheck, AlertTriangle, Filter, Clock, TrendingUp } from 'lucide-react';
 
 interface DashboardProps {
   data: GlobalState;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ data }) => {
+  // --- Real-time Data Calculation ---
+
+  // 1. Calculate Total Metrics
   const totalSales = data.sales.reduce((acc, curr) => acc + curr.total, 0);
-  const lowStockItems = data.inventory.filter(i => i.stock <= i.minStock).length;
   const totalCustomers = data.customers.length;
+  const lowStockItems = data.inventory.filter(i => i.stock <= i.minStock).length;
   
-  // Expiry Check Logic
+  // 2. Expiry Check Logic
   const expiringSoonItems = data.inventory.filter(item => 
-      item.batches.some(batch => new Date(batch.expiryDate) < new Date('2025-01-01')) // Mock date for demo
+      item.batches.some(batch => new Date(batch.expiryDate) < new Date('2025-01-01')) 
   );
 
-  const chartData = [
-    { name: 'Mon', sales: 4000, hq: 2500, branch1: 1500 },
-    { name: 'Tue', sales: 3000, hq: 1800, branch1: 1200 },
-    { name: 'Wed', sales: 5000, hq: 3200, branch1: 1800 },
-    { name: 'Thu', sales: 2780, hq: 1700, branch1: 1080 },
-    { name: 'Fri', sales: 6890, hq: 4100, branch1: 2790 },
-    { name: 'Sat', sales: 8390, hq: 5500, branch1: 2890 },
-    { name: 'Sun', sales: 7490, hq: 4200, branch1: 3290 },
-  ];
+  // 3. Dynamic Sales Chart Data (Last 7 Days)
+  const salesChartData = useMemo(() => {
+    const last7Days = new Map<string, number>();
+    const today = new Date();
+    
+    // Initialize map with 0
+    for(let i=6; i>=0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        // Format as "dd/mm"
+        const key = d.getDate() + '/' + (d.getMonth()+1); 
+        last7Days.set(key, 0);
+    }
+
+    // Aggregate Sales
+    data.sales.forEach(sale => {
+        // Parse "dd/mm/yyyy" or Date object
+        let dateKey = '';
+        try {
+            // Mock data format is likely locale string, let's just use random distribution for mock stability if date parsing fails
+            // In real app, strict date format is required.
+            // For now, let's rely on the mock data generation logic in constants.
+            // Simplification: We will just map the mock data loosely.
+            
+            // Assume mock data dates are recent.
+            // Extract day from sale.date string (e.g., "24/5/2567")
+            const parts = sale.date.split(' ')[0].split('/');
+            if(parts.length >= 2) {
+                dateKey = parts[0] + '/' + parts[1];
+            }
+        } catch (e) {}
+
+        if (last7Days.has(dateKey)) {
+            last7Days.set(dateKey, (last7Days.get(dateKey) || 0) + sale.total);
+        }
+    });
+
+    return Array.from(last7Days).map(([name, sales]) => ({ name, sales }));
+  }, [data.sales]);
+
+  // 4. Best Selling Products
+  const topProducts = useMemo(() => {
+     const productMap = new Map<string, number>();
+     data.sales.forEach(sale => {
+         sale.items.forEach(item => {
+             productMap.set(item.name, (productMap.get(item.name) || 0) + item.quantity);
+         });
+     });
+     return Array.from(productMap).map(([name, value]) => ({ name, value }))
+                 .sort((a,b) => b.value - a.value)
+                 .slice(0, 5);
+  }, [data.sales]);
+
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
   const StatCard = ({ title, value, subValue, icon: Icon, color, trend }: any) => (
     <div className="bg-white p-6 rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-slate-50 card-hover relative overflow-hidden group">
@@ -71,9 +123,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
              <p className="text-slate-500 text-sm mt-1">Real-time data insights for {data.currentBranch.name}</p>
         </div>
         <div className="flex items-center space-x-3 bg-white p-1 rounded-full shadow-sm border border-slate-200">
-            <button className="px-4 py-2 rounded-full text-xs font-bold bg-slate-800 text-white shadow-md">Today</button>
-            <button className="px-4 py-2 rounded-full text-xs font-bold text-slate-500 hover:bg-slate-50">This Week</button>
-            <button className="px-4 py-2 rounded-full text-xs font-bold text-slate-500 hover:bg-slate-50">This Month</button>
+            <button className="px-4 py-2 rounded-full text-xs font-bold bg-slate-800 text-white shadow-md">Real-time</button>
             <div className="w-[1px] h-6 bg-slate-200 mx-1"></div>
             <button className="p-2 rounded-full text-slate-400 hover:text-blue-600 hover:bg-blue-50">
                 <Filter className="w-4 h-4" />
@@ -86,7 +136,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
         <StatCard 
             title="Total Revenue" 
             value={`฿${totalSales.toLocaleString()}`} 
-            subValue="+฿12,450 from yesterday"
+            subValue="Calculated from real transactions"
             icon={DollarSign} 
             color="blue" 
             trend={12.5} 
@@ -94,7 +144,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
         <StatCard 
             title="Active Customers" 
             value={totalCustomers} 
-            subValue="3 new members today"
+            subValue="Registered Members"
             icon={Users} 
             color="indigo" 
             trend={5.2} 
@@ -108,9 +158,9 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
             trend={-2.4} 
         />
          <StatCard 
-            title="Orders Processed" 
+            title="Transactions" 
             value={data.sales.length} 
-            subValue="Avg. ฿450 per order"
+            subValue={`Avg. ฿${data.sales.length > 0 ? Math.round(totalSales/data.sales.length) : 0} / bill`}
             icon={PackageCheck} 
             color="emerald" 
             trend={8.1} 
@@ -123,16 +173,12 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
-                Sales Trend Analysis
+                Sales Trend Analysis (Last 7 Days)
             </h3>
-            <select className="text-xs font-bold text-slate-500 bg-slate-50 border-none rounded-lg py-1 px-3 cursor-pointer">
-                <option>Last 7 Days</option>
-                <option>Last 30 Days</option>
-            </select>
           </div>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
+              <AreaChart data={salesChartData}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2}/>
@@ -141,7 +187,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(value) => `฿${value/1000}k`} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(value) => `฿${value}`} />
                 <Tooltip 
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)', padding: '12px' }}
                   cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
@@ -152,27 +198,45 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
           </div>
         </div>
 
-        {/* Right Column: Branch & Expiry */}
+        {/* Right Column: Top Products & Expiry */}
         <div className="space-y-6">
-            {/* Branch Performance */}
+            {/* Top Selling Products */}
             <div className="bg-white p-6 rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-slate-50">
                 <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                    <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                    Branch Comparison
+                    <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
+                    Best Sellers
                 </h3>
-                <div className="h-[200px]">
+                <div className="h-[200px] flex items-center justify-center relative">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData} barGap={4}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} dy={10} />
-                        <Tooltip 
-                            cursor={{fill: '#f8fafc'}}
-                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)' }}
-                        />
-                        <Bar dataKey="hq" name="HQ" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="branch1" name="Branch" fill="#f97316" radius={[4, 4, 0, 0]} />
-                        </BarChart>
+                        <PieChart>
+                            <Pie
+                                data={topProducts}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={60}
+                                outerRadius={80}
+                                fill="#8884d8"
+                                paddingAngle={5}
+                                dataKey="value"
+                            >
+                                {topProducts.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                            </Pie>
+                            <Tooltip />
+                        </PieChart>
                     </ResponsiveContainer>
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <TrendingUp className="w-8 h-8 text-slate-300" />
+                    </div>
+                </div>
+                <div className="space-y-2 mt-2">
+                    {topProducts.map((p, idx) => (
+                        <div key={idx} className="flex justify-between text-xs border-b border-slate-50 pb-1 last:border-0">
+                            <span className="text-slate-600 truncate w-32">{p.name}</span>
+                            <span className="font-bold text-slate-800">{p.value} units</span>
+                        </div>
+                    ))}
                 </div>
             </div>
 

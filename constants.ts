@@ -1,4 +1,5 @@
 
+
 import { Product, ProductCategory, Customer, PurchaseOrder, SaleRecord, Expense, Branch, Supplier, StockLog, Settings, Shift } from './types';
 
 export const MOCK_BRANCHES: Branch[] = [
@@ -179,30 +180,44 @@ export const MOCK_PO: PurchaseOrder[] = [
   },
 ];
 
-export const MOCK_SALES: SaleRecord[] = [
-  { 
-      id: 'INV-0001', 
-      date: '2024-05-24', 
-      total: 450, 
-      subtotalVatable: 0,
-      subtotalExempt: 450,
-      vatAmount: 0,
-      paymentMethod: 'QR', 
-      items: [], 
-      branchId: 'B001' 
-  },
-  { 
-      id: 'INV-0002', 
-      date: '2024-05-24', 
-      total: 1070, 
-      subtotalVatable: 1000,
-      subtotalExempt: 0,
-      vatAmount: 70,
-      paymentMethod: 'CASH', 
-      items: [], 
-      branchId: 'B001' 
-  },
-];
+// Generate past 7 days of sales for realistic dashboard
+const generateMockSales = (): SaleRecord[] => {
+    const sales: SaleRecord[] = [];
+    const today = new Date();
+    
+    // Past 7 days
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        const dateStr = date.toLocaleString('th-TH');
+        
+        // 3-5 sales per day
+        const dailyCount = 3 + Math.floor(Math.random() * 3);
+        
+        for (let j = 0; j < dailyCount; j++) {
+            const hasVat = Math.random() > 0.5;
+            const total = 500 + Math.floor(Math.random() * 1000);
+            
+            sales.push({
+                id: `INV-${date.getFullYear()}${date.getMonth()}${date.getDate()}-${j}`,
+                date: dateStr,
+                total: total,
+                subtotalVatable: hasVat ? total * 0.934 : 0,
+                subtotalExempt: hasVat ? 0 : total,
+                vatAmount: hasVat ? total * 0.066 : 0,
+                paymentMethod: Math.random() > 0.5 ? 'QR' : 'CASH',
+                items: [
+                   { ...MOCK_INVENTORY[0], quantity: 2 },
+                   { ...MOCK_INVENTORY[2], quantity: 1 }
+                ], // simplified items
+                branchId: 'B001'
+            });
+        }
+    }
+    return sales;
+};
+
+export const MOCK_SALES: SaleRecord[] = generateMockSales();
 
 export const MOCK_STOCK_LOGS: StockLog[] = [
     { id: 'LOG-001', date: '2024-05-24 10:30', productId: 'P001', productName: 'Sara', action: 'SALE', quantity: -2, staffName: 'Admin' },
@@ -215,4 +230,7 @@ export const MOCK_EXPENSES: Expense[] = [
     { id: 'EXP-003', title: 'เงินเดือนพนักงาน (part-time)', category: 'SALARY', amount: 8000, date: '2024-05-25' },
 ];
 
-export const MOCK_SHIFTS: Shift[] = [];
+export const MOCK_SHIFTS: Shift[] = [
+    { id: 'S-1001', staffName: 'Staff A', startTime: '2024-05-24 08:00', endTime: '2024-05-24 16:00', startCash: 1000, expectedCash: 5400, actualCash: 5400, totalSales: 4400, status: 'CLOSED' },
+    { id: 'S-1002', staffName: 'Staff B', startTime: '2024-05-23 08:00', endTime: '2024-05-23 16:00', startCash: 1000, expectedCash: 3500, actualCash: 3450, totalSales: 2500, status: 'CLOSED' }, // Shortage 50
+];
