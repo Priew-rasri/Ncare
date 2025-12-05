@@ -15,7 +15,7 @@ import {
   Cell
 } from 'recharts';
 import { GlobalState } from '../types';
-import { ArrowUpRight, ArrowDownRight, Users, DollarSign, PackageCheck, AlertTriangle, Filter, Clock, TrendingUp, MonitorPlay } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Users, DollarSign, PackageCheck, AlertTriangle, Filter, Clock, TrendingUp, MonitorPlay, PieChart as PieIcon } from 'lucide-react';
 
 interface DashboardProps {
   data: GlobalState;
@@ -79,7 +79,19 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
                  .slice(0, 5);
   }, [data.sales]);
 
-  // 5. Live Queue for "Ncare Service"
+  // 5. Sales By Category
+  const salesByCategory = useMemo(() => {
+      const catMap = new Map<string, number>();
+      data.sales.forEach(sale => {
+          sale.items.forEach(item => {
+              const catName = item.category.split('.')[0] + '..'; // Shorten name
+              catMap.set(catName, (catMap.get(catName) || 0) + (item.price * item.quantity));
+          });
+      });
+      return Array.from(catMap).map(([name, value]) => ({ name, value }));
+  }, [data.sales]);
+
+  // 6. Live Queue for "Ncare Service"
   const queueList = useMemo(() => {
       // Get today's sales and show last 4
       const today = new Date().toLocaleDateString('en-CA');
@@ -279,6 +291,44 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
                 </div>
             </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-slate-50">
+               <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+                    <PieIcon className="w-5 h-5 text-purple-500" /> Sales by Category
+               </h3>
+               <div className="h-[250px]">
+                   <ResponsiveContainer width="100%" height="100%">
+                       <BarChart data={salesByCategory} layout="vertical" margin={{ left: 20 }}>
+                           <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                           <XAxis type="number" hide />
+                           <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 10}} />
+                           <Tooltip cursor={{fill: 'transparent'}} />
+                           <Bar dataKey="value" fill="#8884d8" radius={[0, 4, 4, 0]}>
+                               {salesByCategory.map((entry, index) => (
+                                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                               ))}
+                           </Bar>
+                       </BarChart>
+                   </ResponsiveContainer>
+               </div>
+          </div>
+          
+           <div className="bg-white p-6 rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-slate-50 flex items-center justify-center">
+               <div className="text-center">
+                   <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                       <Clock className="w-8 h-8 text-blue-500" />
+                   </div>
+                   <h3 className="font-bold text-slate-800 text-lg">Peak Hour Analysis</h3>
+                   <p className="text-slate-500 text-sm mt-2 max-w-xs mx-auto">
+                       Advanced hourly traffic analysis is gathering data. Please wait for more transactions.
+                   </p>
+                   <button className="mt-4 px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200">
+                       Configure Shift Hours
+                   </button>
+               </div>
+           </div>
       </div>
     </div>
   );

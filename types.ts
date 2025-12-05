@@ -44,7 +44,7 @@ export interface StockLog {
   date: string;
   productId: string;
   productName: string;
-  action: 'SALE' | 'RECEIVE' | 'ADJUST' | 'RETURN' | 'TRANSFER_IN' | 'TRANSFER_OUT' | 'VOID_RETURN';
+  action: 'SALE' | 'RECEIVE' | 'ADJUST' | 'RETURN' | 'TRANSFER_IN' | 'TRANSFER_OUT' | 'VOID_RETURN' | 'CREATE' | 'EDIT';
   quantity: number;
   staffName: string;
   note?: string;
@@ -271,8 +271,8 @@ export interface GlobalState {
 export type Action =
   | { type: 'LOGIN'; payload: User }
   | { type: 'LOGOUT' }
-  | { type: 'LOAD_STATE'; payload: GlobalState } // For persistence
-  | { type: 'IMPORT_DATA'; payload: GlobalState } // For backup/restore
+  | { type: 'LOAD_STATE'; payload: GlobalState } 
+  | { type: 'IMPORT_DATA'; payload: GlobalState }
   | { type: 'ADD_SALE'; payload: SaleRecord }
   | { type: 'VOID_SALE'; payload: { saleId: string; reason: string; user: string } }
   | { type: 'UPDATE_STOCK'; payload: { productId: string; quantity: number; note: string } }
@@ -291,4 +291,6 @@ export type Action =
   | { type: 'DELETE_HELD_BILL'; payload: string }
   | { type: 'UPDATE_CART_INSTRUCTION'; payload: { productId: string; instruction: string } }
   | { type: 'LOG_SYSTEM_EVENT'; payload: Omit<SystemLog, 'id' | 'timestamp'> }
-  | { type: 'REQUEST_TRANSFER'; payload: TransferRequest };
+  | { type: 'REQUEST_TRANSFER'; payload: TransferRequest }
+  | { type: 'ADD_PRODUCT'; payload: Product }
+  | { type: 'EDIT_PRODUCT'; payload: Product };

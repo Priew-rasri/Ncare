@@ -82,9 +82,7 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
         return action.payload;
         
     case 'IMPORT_DATA':
-        // Restore everything but keep the current user session if needed, or logout.
-        // For security, let's keep the user logged in but warn them in the UI.
-        // We override everything with payload
+        // Restore everything but keep the current user session if needed
         return {
             ...action.payload,
             currentUser: state.currentUser, // Maintain session
@@ -283,15 +281,6 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             note: action.payload.reason
         };
         
-        const sysLog: SystemLog = {
-             id: `SYS-${Date.now()}`,
-             timestamp: new Date().toLocaleString(),
-             actor: action.payload.staff,
-             action: 'STOCK_ADJUST',
-             details: `Adjusted ${adjustProduct.name} by ${action.payload.quantity} (${action.payload.reason})`,
-             severity: 'WARNING'
-        };
-
         return {
             ...state,
             inventory: state.inventory.map(p => 
@@ -299,8 +288,7 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
                 ? { ...p, stock: p.stock + action.payload.quantity }
                 : p
             ),
-            stockLogs: [adjustmentLog, ...state.stockLogs],
-            systemLogs: [sysLog, ...state.systemLogs]
+            stockLogs: [adjustmentLog, ...state.stockLogs]
         };
 
     case 'UPDATE_CUSTOMER_POINTS':
@@ -382,9 +370,6 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
         
     case 'CLOSE_SHIFT':
         if (!state.activeShift) return state;
-        // Calculate Expected Cash: Start + Cash Sales - Pay Outs + Cash Drops
-        // Wait, Cash Drops usually reduce drawer cash, so we subtract both PayOut and Drop from "Expected in Drawer"
-        // But actual cash count should match this.
         
         const totalPayOut = state.activeShift.cashTransactions
             .filter(t => t.type === 'PAY_OUT' || t.type === 'CASH_DROP')
@@ -476,7 +461,38 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
                 severity: 'INFO'
             }, ...state.systemLogs]
         };
-    
+
+    case 'ADD_PRODUCT':
+        const newProductLog: StockLog = {
+            id: `LOG-CREATE-${Date.now()}`,
+            date: new Date().toLocaleString(),
+            productId: action.payload.id,
+            productName: action.payload.name,
+            action: 'CREATE',
+            quantity: action.payload.stock,
+            staffName: state.currentUser?.name || 'Admin',
+            note: 'New Product Added'
+        };
+        return {
+            ...state,
+            inventory: [...state.inventory, action.payload],
+            stockLogs: [newProductLog, ...state.stockLogs]
+        };
+
+    case 'EDIT_PRODUCT':
+        return {
+            ...state,
+            inventory: state.inventory.map(p => p.id === action.payload.id ? action.payload : p),
+            systemLogs: [{
+                id: `SYS-${Date.now()}`,
+                timestamp: new Date().toLocaleString(),
+                actor: state.currentUser?.name || 'Admin',
+                action: 'EDIT_PRODUCT',
+                details: `Edited product details: ${action.payload.name}`,
+                severity: 'INFO'
+            }, ...state.systemLogs]
+        };
+
     case 'UPDATE_CART_INSTRUCTION':
         return state; 
 

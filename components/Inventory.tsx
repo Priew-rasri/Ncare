@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { GlobalState, TransferRequest, Product } from '../types';
-import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight, TrendingUp, PieChart, Truck, ArrowLeftRight, Printer, Tag, FileText, AlertOctagon } from 'lucide-react';
+import { GlobalState, TransferRequest, Product, ProductCategory } from '../types';
+import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight, TrendingUp, PieChart, Truck, ArrowLeftRight, Printer, Tag, FileText, AlertOctagon, Plus, Edit } from 'lucide-react';
 
 interface InventoryProps {
   data: GlobalState;
@@ -19,6 +19,11 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
   const [adjustQty, setAdjustQty] = useState(0);
   const [adjustReason, setAdjustReason] = useState('Damaged Stock');
   
+  // Product CRUD Modal
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productForm, setProductForm] = useState<Partial<Product>>({});
+
   // Shelf Tag Printing State
   const [showTagModal, setShowTagModal] = useState(false);
   const [tagProduct, setTagProduct] = useState<Product | null>(null);
@@ -74,6 +79,55 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
       setStockCardProduct(product);
       setShowStockCard(true);
   };
+  
+  const handleOpenAddProduct = () => {
+      setEditingProduct(null);
+      setProductForm({
+          category: ProductCategory.PAIN_FEVER,
+          isVatExempt: true,
+          requiresPrescription: false,
+          stock: 0,
+          minStock: 10,
+          unit: 'ชิ้น',
+          batches: []
+      });
+      setShowProductModal(true);
+  };
+  
+  const handleOpenEditProduct = (product: Product) => {
+      setEditingProduct(product);
+      setProductForm({ ...product });
+      setShowProductModal(true);
+  };
+
+  const handleSaveProduct = () => {
+      if (!productForm.name || !productForm.price || !productForm.barcode) {
+          alert("Please fill in required fields (Name, Barcode, Price)");
+          return;
+      }
+
+      if (editingProduct) {
+          // Update
+          dispatch({ 
+              type: 'EDIT_PRODUCT', 
+              payload: { ...editingProduct, ...productForm } as Product 
+          });
+      } else {
+          // Create
+          const newProduct: Product = {
+              ...productForm as Product,
+              id: `P${Date.now()}`,
+              batches: [] // Initial batches empty, use Receive PO to add
+          };
+          dispatch({ type: 'ADD_PRODUCT', payload: newProduct });
+      }
+      setShowProductModal(false);
+  };
+
+  const generateBarcode = () => {
+      const random = Math.floor(Math.random() * 900000000000) + 100000000000;
+      setProductForm(prev => ({ ...prev, barcode: `885${random}` }));
+  };
 
   const getFilteredInventory = () => {
       return data.inventory.filter(item => 
@@ -98,6 +152,9 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
              />
           </div>
           <div className="flex gap-2">
+            <button onClick={handleOpenAddProduct} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-md hover:bg-blue-700 transition-colors">
+                <Plus className="w-4 h-4" /> Add Product
+            </button>
             <button onClick={() => setShowTransferModal(true)} className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg text-sm font-bold transition-colors">
                 <Truck className="w-4 h-4" /> Request Stock
             </button>
@@ -131,7 +188,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                             <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-1"><Barcode className="w-3 h-3"/> {item.barcode}</div>
                         </td>
                         <td className="px-6 py-4 text-slate-600 text-xs">
-                             <div className="font-bold text-slate-700">{item.category}</div>
+                             <div className="font-bold text-slate-700 truncate max-w-[150px]">{item.category}</div>
                              {item.subCategory && <div className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded inline-block mt-1 border border-blue-100">{item.subCategory}</div>}
                              <div className="text-[10px] text-slate-400 mt-1">{item.location}</div>
                         </td>
@@ -143,6 +200,9 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                              </span>
                         </td>
                         <td className="px-6 py-4 text-center flex justify-center gap-2">
+                            <button onClick={(e) => { e.stopPropagation(); handleOpenEditProduct(item); }} className="text-slate-500 hover:text-blue-600 p-2 rounded-full hover:bg-white border border-transparent hover:border-slate-200 transition-all" title="Edit Product">
+                                <Edit className="w-4 h-4" />
+                            </button>
                             <button onClick={(e) => { e.stopPropagation(); openStockCard(item); }} className="text-slate-500 hover:text-blue-600 p-2 rounded-full hover:bg-white border border-transparent hover:border-slate-200 transition-all" title="View Stock Card">
                                 <FileText className="w-4 h-4" />
                             </button>
@@ -169,23 +229,27 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                            {item.batches.map((batch, idx) => (
-                                                <tr key={idx}>
-                                                    <td className="px-4 py-2 font-mono">{batch.lotNumber}</td>
-                                                    <td className={`px-4 py-2 font-bold ${new Date(batch.expiryDate) < new Date('2025-01-01') ? 'text-red-500' : 'text-slate-600'}`}>
-                                                        {batch.expiryDate}
-                                                    </td>
-                                                    <td className="px-4 py-2 text-right">{batch.quantity}</td>
-                                                    <td className="px-4 py-2 text-right">฿{batch.costPrice}</td>
-                                                    <td className="px-4 py-2 text-center">
-                                                        {new Date(batch.expiryDate) < new Date() ? (
-                                                            <span className="bg-red-100 text-red-600 px-1 py-0.5 rounded text-[10px] font-bold">EXPIRED</span>
-                                                        ) : (
-                                                            <span className="bg-green-100 text-green-600 px-1 py-0.5 rounded text-[10px] font-bold">GOOD</span>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                            {item.batches.length === 0 ? (
+                                                <tr><td colSpan={5} className="text-center py-2 text-slate-400">No batches available</td></tr>
+                                            ) : (
+                                                item.batches.map((batch, idx) => (
+                                                    <tr key={idx}>
+                                                        <td className="px-4 py-2 font-mono">{batch.lotNumber}</td>
+                                                        <td className={`px-4 py-2 font-bold ${new Date(batch.expiryDate) < new Date('2025-01-01') ? 'text-red-500' : 'text-slate-600'}`}>
+                                                            {batch.expiryDate}
+                                                        </td>
+                                                        <td className="px-4 py-2 text-right">{batch.quantity}</td>
+                                                        <td className="px-4 py-2 text-right">฿{batch.costPrice}</td>
+                                                        <td className="px-4 py-2 text-center">
+                                                            {new Date(batch.expiryDate) < new Date() ? (
+                                                                <span className="bg-red-100 text-red-600 px-1 py-0.5 rounded text-[10px] font-bold">EXPIRED</span>
+                                                            ) : (
+                                                                <span className="bg-green-100 text-green-600 px-1 py-0.5 rounded text-[10px] font-bold">GOOD</span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
@@ -229,6 +293,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                                 log.action === 'SALE' ? 'bg-blue-50 text-blue-700 border-blue-100' :
                                 log.action === 'RECEIVE' ? 'bg-green-50 text-green-700 border-green-100' :
                                 log.action === 'VOID_RETURN' ? 'bg-purple-50 text-purple-700 border-purple-100' :
+                                log.action === 'CREATE' ? 'bg-teal-50 text-teal-700 border-teal-100' :
                                 'bg-orange-50 text-orange-700 border-orange-100'
                             }`}>
                                 {log.action}
@@ -427,6 +492,143 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
   return (
     <div className="space-y-6 animate-fade-in pb-10 relative">
       
+      {/* Product CRUD Modal */}
+      {showProductModal && (
+          <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 fixed top-0 left-0 w-full h-full">
+              <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-6 overflow-y-auto max-h-[90vh]">
+                  <div className="flex justify-between items-center mb-6">
+                      <h3 className="font-bold text-xl text-slate-800 flex items-center gap-2">
+                          {editingProduct ? <Edit className="w-6 h-6 text-blue-600" /> : <Plus className="w-6 h-6 text-green-600" />}
+                          {editingProduct ? 'Edit Product' : 'Add New Product'}
+                      </h3>
+                      <button onClick={() => setShowProductModal(false)}><X className="w-6 h-6 text-slate-400" /></button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-6">
+                      <div className="col-span-2 md:col-span-1">
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Barcode *</label>
+                          <div className="flex gap-2">
+                              <input 
+                                  type="text" 
+                                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl"
+                                  value={productForm.barcode || ''}
+                                  onChange={e => setProductForm({...productForm, barcode: e.target.value})}
+                                  placeholder="Scan or Enter"
+                              />
+                              <button onClick={generateBarcode} className="p-3 bg-slate-100 rounded-xl hover:bg-slate-200" title="Generate Random Barcode">
+                                  <RefreshCw className="w-4 h-4 text-slate-600"/>
+                              </button>
+                          </div>
+                      </div>
+                      <div className="col-span-2 md:col-span-1">
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Category</label>
+                          <select 
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                              value={productForm.category}
+                              onChange={e => setProductForm({...productForm, category: e.target.value as any})}
+                          >
+                              {Object.values(ProductCategory).map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                      </div>
+
+                      <div className="col-span-2">
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Product Name *</label>
+                          <input 
+                              type="text" 
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl"
+                              value={productForm.name || ''}
+                              onChange={e => setProductForm({...productForm, name: e.target.value})}
+                              placeholder="Brand Name + Dosage"
+                          />
+                      </div>
+                      
+                      <div className="col-span-2">
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Generic Name</label>
+                          <input 
+                              type="text" 
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl"
+                              value={productForm.genericName || ''}
+                              onChange={e => setProductForm({...productForm, genericName: e.target.value})}
+                              placeholder="Scientific Name"
+                          />
+                      </div>
+
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Sell Price *</label>
+                          <input 
+                              type="number" 
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-blue-600"
+                              value={productForm.price || ''}
+                              onChange={e => setProductForm({...productForm, price: Number(e.target.value)})}
+                              placeholder="0.00"
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cost Price</label>
+                          <input 
+                              type="number" 
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl"
+                              value={productForm.cost || ''}
+                              onChange={e => setProductForm({...productForm, cost: Number(e.target.value)})}
+                              placeholder="0.00"
+                          />
+                      </div>
+
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Min Stock Alert</label>
+                          <input 
+                              type="number" 
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl"
+                              value={productForm.minStock || ''}
+                              onChange={e => setProductForm({...productForm, minStock: Number(e.target.value)})}
+                              placeholder="10"
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Unit</label>
+                          <input 
+                              type="text" 
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl"
+                              value={productForm.unit || ''}
+                              onChange={e => setProductForm({...productForm, unit: e.target.value})}
+                              placeholder="Box, Bottle, Pack"
+                          />
+                      </div>
+                      
+                      <div className="col-span-2 flex gap-4 mt-2">
+                           <label className="flex items-center gap-2 cursor-pointer">
+                               <input 
+                                  type="checkbox" 
+                                  className="w-4 h-4"
+                                  checked={productForm.isVatExempt || false}
+                                  onChange={e => setProductForm({...productForm, isVatExempt: e.target.checked})}
+                               />
+                               <span className="text-sm font-medium">VAT Exempt (Non-VAT)</span>
+                           </label>
+                           <label className="flex items-center gap-2 cursor-pointer">
+                               <input 
+                                  type="checkbox" 
+                                  className="w-4 h-4"
+                                  checked={productForm.requiresPrescription || false}
+                                  onChange={e => setProductForm({...productForm, requiresPrescription: e.target.checked})}
+                               />
+                               <span className="text-sm font-medium text-red-600">Requires Prescription</span>
+                           </label>
+                      </div>
+                  </div>
+
+                  <div className="mt-8 flex gap-3">
+                      <button onClick={handleSaveProduct} className="flex-1 py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700">
+                          {editingProduct ? 'Save Changes' : 'Create Product'}
+                      </button>
+                      <button onClick={() => setShowProductModal(false)} className="flex-1 py-4 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50">
+                          Cancel
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Stock Card Modal */}
       {showStockCard && stockCardProduct && (
           <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
