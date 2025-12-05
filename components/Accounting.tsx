@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { GlobalState, PurchaseOrder } from '../types';
-import { FileText, CheckCircle, Clock, XCircle, TrendingUp, TrendingDown, DollarSign, Calendar, AlertCircle, Printer, Users, Truck, Phone, Box, Plus, X, ShoppingCart } from 'lucide-react';
+import { FileText, CheckCircle, Clock, XCircle, TrendingUp, TrendingDown, DollarSign, Calendar, AlertCircle, Printer, Users, Truck, Phone, Box, Plus, X, ShoppingCart, Percent } from 'lucide-react';
 
 interface AccountingProps {
     data: GlobalState;
@@ -14,11 +14,17 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
     
     // New PO Form State
     const [newPOSupplier, setNewPOSupplier] = useState('');
-    const [newPOItems, setNewPOItems] = useState<{pid: string, qty: number}[]>([]);
     
     const totalRevenue = data.sales.reduce((acc, curr) => acc + curr.total, 0);
     const totalExpenses = data.expenses.reduce((acc, curr) => acc + curr.amount, 0);
-    const totalCOGS = totalRevenue * 0.6; // Estimated COGS
+    
+    // Tax Calculations
+    const totalOutputVAT = data.sales.reduce((acc, curr) => acc + (curr.vatAmount || 0), 0);
+    const totalVatableSales = data.sales.reduce((acc, curr) => acc + (curr.subtotalVatable || 0), 0);
+    const totalExemptSales = data.sales.reduce((acc, curr) => acc + (curr.subtotalExempt || 0), 0);
+    
+    // Approximate COGS logic for demo (usually tracked via inventory cost)
+    const totalCOGS = totalRevenue * 0.6; 
     const netProfit = totalRevenue - totalCOGS - totalExpenses;
 
     const TabButton = ({ id, label }: { id: string, label: string }) => (
@@ -42,9 +48,6 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
 
     const handleCreatePO = () => {
         if(!newPOSupplier) return;
-        
-        // Mocking item selection for this demo, in real app would be a dynamic list
-        // Let's assume we buy P001 and P002 for simplicity or random items
         const supplierObj = data.suppliers.find(s => s.id === newPOSupplier);
         
         const newPO: PurchaseOrder = {
@@ -68,9 +71,9 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
     };
 
     const renderOverview = () => (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-fade-in">
             {/* P&L Card */}
-            <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
+            <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 p-8 lg:col-span-2">
                 <div className="flex justify-between items-start mb-6">
                     <h3 className="font-bold text-slate-800 text-lg flex items-center gap-3">
                         <div className="bg-blue-100 p-2 rounded-lg">
@@ -81,63 +84,100 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
                     <button className="text-slate-400 hover:text-blue-600"><Printer className="w-5 h-5"/></button>
                 </div>
                 
-                <div className="space-y-6">
-                    <div className="flex justify-between items-center p-6 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-100">
-                        <div>
-                            <span className="block text-emerald-800 text-sm font-bold uppercase tracking-wide">Total Revenue</span>
-                            <span className="text-xs text-emerald-600 mt-1 opacity-80">Gross Sales (VAT Included)</span>
+                <div className="grid grid-cols-2 gap-8">
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-center p-6 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-100">
+                            <div>
+                                <span className="block text-emerald-800 text-sm font-bold uppercase tracking-wide">Total Revenue</span>
+                                <span className="text-xs text-emerald-600 mt-1 opacity-80">Gross Sales (VAT Included)</span>
+                            </div>
+                            <span className="text-emerald-800 font-bold text-3xl tracking-tight">฿{totalRevenue.toLocaleString()}</span>
                         </div>
-                        <span className="text-emerald-800 font-bold text-3xl tracking-tight">฿{totalRevenue.toLocaleString()}</span>
+
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center px-2">
+                                <span className="text-slate-500 text-sm font-medium">Cost of Goods Sold (COGS)</span>
+                                <span className="text-slate-800 font-semibold">-฿{totalCOGS.toLocaleString()}</span>
+                            </div>
+                            <div className="w-full bg-slate-100 h-[1px]"></div>
+                            <div className="flex justify-between items-center px-2">
+                                <span className="text-slate-500 text-sm font-medium">Operating Expenses</span>
+                                <span className="text-slate-800 font-semibold">-฿{totalExpenses.toLocaleString()}</span>
+                            </div>
+                        </div>
+                        
+                        <div className="pt-6 border-t-2 border-slate-100 flex justify-between items-center">
+                            <span className="text-slate-900 font-bold text-lg">Net Profit</span>
+                            <span className={`font-bold text-3xl tracking-tight ${netProfit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                                {netProfit >= 0 ? '+' : ''}฿{netProfit.toLocaleString()}
+                            </span>
+                        </div>
                     </div>
 
-                    <div className="space-y-3">
-                         <div className="flex justify-between items-center px-2">
-                            <span className="text-slate-500 text-sm font-medium">Cost of Goods Sold (COGS)</span>
-                            <span className="text-slate-800 font-semibold">-฿{totalCOGS.toLocaleString()}</span>
-                        </div>
-                        <div className="w-full bg-slate-100 h-[1px]"></div>
-                        <div className="flex justify-between items-center px-2">
-                            <span className="text-slate-500 text-sm font-medium">Operating Expenses</span>
-                            <span className="text-slate-800 font-semibold">-฿{totalExpenses.toLocaleString()}</span>
-                        </div>
-                    </div>
-                    
-                    <div className="pt-6 border-t-2 border-slate-100 flex justify-between items-center">
-                        <span className="text-slate-900 font-bold text-lg">Net Profit</span>
-                        <span className={`font-bold text-3xl tracking-tight ${netProfit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                            {netProfit >= 0 ? '+' : ''}฿{netProfit.toLocaleString()}
-                        </span>
+                    {/* Tax Breakdown Mini-Widget inside P&L */}
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                        <h4 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
+                            <Percent className="w-4 h-4 text-slate-400" /> Revenue Tax Breakdown
+                        </h4>
+                         <div className="space-y-4">
+                            <div>
+                                <div className="flex justify-between text-sm mb-1">
+                                    <span className="text-slate-500">Exempt Sales (Non-VAT)</span>
+                                    <span className="font-bold text-slate-700">฿{totalExemptSales.toLocaleString()}</span>
+                                </div>
+                                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                                    <div className="bg-green-400 h-full" style={{ width: `${(totalExemptSales / (totalRevenue || 1)) * 100}%` }}></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div className="flex justify-between text-sm mb-1">
+                                    <span className="text-slate-500">Vatable Sales (Base)</span>
+                                    <span className="font-bold text-slate-700">฿{totalVatableSales.toLocaleString()}</span>
+                                </div>
+                                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                                    <div className="bg-blue-400 h-full" style={{ width: `${(totalVatableSales / (totalRevenue || 1)) * 100}%` }}></div>
+                                </div>
+                            </div>
+                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Pending AP Card */}
-            <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                 <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-3 text-lg">
-                    <div className="bg-orange-100 p-2 rounded-lg">
-                        <AlertCircle className="w-5 h-5 text-orange-500" />
+            <div className="space-y-8">
+                 {/* Tax Liability Card */}
+                <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 p-6 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-purple-50 rounded-full -mr-16 -mt-16 z-0"></div>
+                    <div className="relative z-10">
+                        <h3 className="font-bold text-slate-800 mb-1">Tax Liability</h3>
+                        <p className="text-xs text-slate-500 mb-4">Output VAT (ภาษีขายรอชำระ)</p>
+                        <div className="text-4xl font-bold text-purple-700 mb-2">฿{totalOutputVAT.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+                        <div className="text-xs bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg border border-purple-100 inline-block">
+                             Current Month Accrued
+                        </div>
                     </div>
-                    Accounts Payable (Unpaid POs)
-                </h3>
-                <div className="space-y-4">
-                     {data.purchaseOrders.filter(po => po.paymentStatus === 'UNPAID').map(po => (
-                         <div key={po.id} className="flex justify-between items-center p-5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow group cursor-pointer">
-                             <div>
-                                 <div className="font-bold text-slate-800 text-base group-hover:text-blue-600 transition-colors">{po.supplierName}</div>
-                                 <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">Due: <span className="font-mono">{po.dueDate}</span></div>
-                             </div>
-                             <div className="text-right">
-                                 <div className="font-bold text-slate-900 text-lg">฿{po.totalAmount.toLocaleString()}</div>
-                                 <div className="text-[10px] text-orange-600 font-bold bg-orange-50 px-2 py-0.5 rounded border border-orange-100 inline-block mt-1 uppercase">Pending</div>
-                             </div>
-                         </div>
-                     ))}
-                     {data.purchaseOrders.filter(po => po.paymentStatus === 'UNPAID').length === 0 && (
-                         <div className="text-center text-slate-400 py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                            <CheckCircle className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                            <p className="font-medium">All caught up! No pending payments.</p>
-                         </div>
-                     )}
+                </div>
+
+                {/* Pending AP Card */}
+                <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 p-6">
+                    <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-3">
+                        <div className="bg-orange-100 p-2 rounded-lg">
+                            <AlertCircle className="w-5 h-5 text-orange-500" />
+                        </div>
+                        Accounts Payable
+                    </h3>
+                    <div className="space-y-4">
+                        {data.purchaseOrders.filter(po => po.paymentStatus === 'UNPAID').slice(0, 3).map(po => (
+                            <div key={po.id} className="flex justify-between items-center pb-3 border-b border-slate-50 last:border-0 last:pb-0">
+                                <div>
+                                    <div className="font-bold text-slate-700 text-sm truncate w-24">{po.supplierName}</div>
+                                    <div className="text-[10px] text-slate-400">Due: {po.dueDate}</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="font-bold text-slate-900 text-sm">฿{po.totalAmount.toLocaleString()}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>
@@ -326,7 +366,7 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                      <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Financial Hub</h2>
-                     <p className="text-slate-500 text-sm mt-1">Manage Cashflow, POs, Suppliers and Expenses</p>
+                     <p className="text-slate-500 text-sm mt-1">Manage Cashflow, POs, Suppliers, Expenses & Taxes</p>
                 </div>
                 <div className="flex bg-white p-1 rounded-full border border-slate-200 shadow-sm overflow-x-auto">
                     <TabButton id="OVERVIEW" label="Overview" />

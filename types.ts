@@ -42,7 +42,8 @@ export interface Product {
   batches: Batch[];
   image?: string;
   requiresPrescription?: boolean;
-  drugInteractions?: string[]; // List of generic names this interacts with
+  drugInteractions?: string[];
+  isVatExempt: boolean; // New: For tax management
 }
 
 export interface Customer {
@@ -65,6 +66,12 @@ export interface SaleRecord {
   customerId?: string;
   items: CartItem[];
   total: number;
+  
+  // Tax Breakdown for Accounting
+  subtotalVatable: number; // Base amount for VAT items
+  subtotalExempt: number;  // Amount for Non-VAT items
+  vatAmount: number;       // The 7% amount
+  
   paymentMethod: 'CASH' | 'QR' | 'CREDIT';
   branchId: string;
   shiftId?: string;
@@ -121,8 +128,8 @@ export interface Shift {
   startTime: string;
   endTime?: string;
   startCash: number;
-  expectedCash?: number; // System calced
-  actualCash?: number; // User counted
+  expectedCash?: number; 
+  actualCash?: number; 
   totalSales: number;
   status: 'OPEN' | 'CLOSED';
 }

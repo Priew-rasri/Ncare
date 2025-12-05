@@ -39,6 +39,7 @@ export const MOCK_INVENTORY: Product[] = [
     unit: 'แผง',
     requiresPrescription: false,
     drugInteractions: ['Warfarin', 'Alcohol'],
+    isVatExempt: true, // Medicine often exempt
     batches: [
         { lotNumber: 'L23001', expiryDate: '2025-12-31', quantity: 100, costPrice: 8 },
         { lotNumber: 'L22055', expiryDate: '2024-11-30', quantity: 20, costPrice: 7.5 },
@@ -59,6 +60,7 @@ export const MOCK_INVENTORY: Product[] = [
     unit: 'แผง',
     requiresPrescription: true,
     drugInteractions: ['Warfarin', 'Methotrexate'],
+    isVatExempt: true, // Medicine often exempt
     batches: [
         { lotNumber: 'A9901', expiryDate: '2024-10-15', quantity: 45, costPrice: 45 }
     ]
@@ -77,6 +79,7 @@ export const MOCK_INVENTORY: Product[] = [
     minStock: 10,
     unit: 'กระปุก',
     requiresPrescription: false,
+    isVatExempt: false, // Supplement has VAT
     batches: [
          { lotNumber: 'V8821', expiryDate: '2026-05-20', quantity: 20, costPrice: 200 }
     ]
@@ -95,6 +98,7 @@ export const MOCK_INVENTORY: Product[] = [
     minStock: 100,
     unit: 'ชิ้น',
     requiresPrescription: false,
+    isVatExempt: false, // Equipment has VAT
     batches: [
          { lotNumber: 'M1123', expiryDate: '2030-01-01', quantity: 500, costPrice: 10 }
     ]
@@ -113,7 +117,8 @@ export const MOCK_INVENTORY: Product[] = [
     minStock: 20,
     unit: 'ขวด',
     requiresPrescription: false,
-    drugInteractions: ['Paracetamol'], // Mock interaction for demo
+    drugInteractions: ['Paracetamol'],
+    isVatExempt: false,
     batches: [
         { lotNumber: 'ALC001', expiryDate: '2025-02-14', quantity: 8, costPrice: 30 }
     ]
@@ -132,6 +137,7 @@ export const MOCK_INVENTORY: Product[] = [
     minStock: 5,
     unit: 'หลอด',
     requiresPrescription: false,
+    isVatExempt: false, // Cosmetic has VAT
     batches: [
         { lotNumber: 'CR009', expiryDate: '2025-08-10', quantity: 15, costPrice: 500 }
     ]
@@ -174,8 +180,28 @@ export const MOCK_PO: PurchaseOrder[] = [
 ];
 
 export const MOCK_SALES: SaleRecord[] = [
-  { id: 'INV-0001', date: '2024-05-24', total: 450, paymentMethod: 'QR', items: [], branchId: 'B001' },
-  { id: 'INV-0002', date: '2024-05-24', total: 120, paymentMethod: 'CASH', items: [], branchId: 'B001' },
+  { 
+      id: 'INV-0001', 
+      date: '2024-05-24', 
+      total: 450, 
+      subtotalVatable: 0,
+      subtotalExempt: 450,
+      vatAmount: 0,
+      paymentMethod: 'QR', 
+      items: [], 
+      branchId: 'B001' 
+  },
+  { 
+      id: 'INV-0002', 
+      date: '2024-05-24', 
+      total: 1070, 
+      subtotalVatable: 1000,
+      subtotalExempt: 0,
+      vatAmount: 70,
+      paymentMethod: 'CASH', 
+      items: [], 
+      branchId: 'B001' 
+  },
 ];
 
 export const MOCK_STOCK_LOGS: StockLog[] = [

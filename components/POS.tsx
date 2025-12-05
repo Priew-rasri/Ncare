@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { GlobalState, Product, CartItem, SaleRecord, Shift } from '../types';
-import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent } from 'lucide-react';
 
 interface POSProps {
   state: GlobalState;
@@ -40,6 +40,32 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
 
   const activeShift = state.activeShift;
 
+  // --- CALCULATION LOGIC ---
+  const calculateTotals = (cartItems: CartItem[]) => {
+      let total = 0;
+      let totalExempt = 0;
+      let totalVatable = 0; // Inclusive
+
+      cartItems.forEach(item => {
+          const lineTotal = item.price * item.quantity;
+          total += lineTotal;
+          if (item.isVatExempt) {
+              totalExempt += lineTotal;
+          } else {
+              totalVatable += lineTotal;
+          }
+      });
+
+      // Calculate VAT from Inclusive Price: Price * 7 / 107
+      const vatRate = state.settings.vatRate || 7;
+      const vatAmount = totalVatable * (vatRate / (100 + vatRate));
+      const subtotalVatableBase = totalVatable - vatAmount;
+
+      return { total, totalExempt, totalVatable, subtotalVatableBase, vatAmount };
+  };
+
+  const { total: cartTotal, totalExempt, vatAmount, subtotalVatableBase } = calculateTotals(cart);
+
   const getAllergyWarnings = (product: Product) => {
       if (!selectedCustomer) return null;
       const allergy = selectedCustomer.allergies?.find(a => 
@@ -54,11 +80,9 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       const interactions: string[] = [];
       if (product.drugInteractions) {
           currentCart.forEach(cartItem => {
-               // Check if the product being added interacts with anything in the cart
                if (product.drugInteractions?.includes(cartItem.genericName)) {
                    interactions.push(`${product.name} ❌ ${cartItem.name}`);
                }
-               // Check if anything in the cart interacts with the product being added
                if (cartItem.drugInteractions?.includes(product.genericName)) {
                    interactions.push(`${cartItem.name} ❌ ${product.name}`);
                }
@@ -112,17 +136,23 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     }));
   };
 
-  const cartTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-
   const handleCheckout = (method: 'CASH' | 'QR' | 'CREDIT') => {
     if (cart.length === 0) return;
     if (needsPrescription && !window.confirm("กรุณายืนยันว่าเภสัชกรได้ตรวจสอบใบสั่งแพทย์แล้ว?")) return;
+
+    const { total, totalExempt, totalVatable, subtotalVatableBase, vatAmount } = calculateTotals(cart);
 
     const sale: SaleRecord = {
       id: `INV-${Date.now()}`,
       date: new Date().toLocaleString('th-TH'),
       items: cart,
-      total: cartTotal,
+      total: total,
+      
+      // Tax Breakdown
+      subtotalExempt: totalExempt,
+      subtotalVatable: subtotalVatableBase,
+      vatAmount: vatAmount,
+
       paymentMethod: method,
       customerId: selectedCustomerId || undefined,
       branchId: state.currentBranch.id,
@@ -136,7 +166,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     if (selectedCustomerId) {
         dispatch({ 
             type: 'UPDATE_CUSTOMER_POINTS', 
-            payload: { customerId: selectedCustomerId, points: Math.floor(cartTotal / 20), spent: cartTotal } 
+            payload: { customerId: selectedCustomerId, points: Math.floor(total / 20), spent: total } 
         });
     }
 
@@ -162,7 +192,6 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
 
   // ---------------- RENDER ---------------- //
 
-  // 1. No Active Shift - Show Open Shift Screen
   if (!activeShift) {
       return (
           <div className="h-[calc(100vh-8rem)] flex items-center justify-center animate-fade-in">
@@ -194,7 +223,6 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       );
   }
 
-  // 2. Active Shift - Show POS
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-9rem)] gap-6 animate-fade-in pb-2 relative">
       
@@ -257,7 +285,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                     <div className="text-center mb-4">
                         <h3 className="font-bold text-slate-800">{state.settings.storeName}</h3>
                         <p className="text-xs text-slate-500">{state.settings.address}</p>
-                        <p className="text-xs text-slate-500">Tax ID: {state.settings.taxId}</p>
+                        <p className="text-xs text-slate-500">Tax ID: {state.settings.taxId} | VAT Included</p>
                     </div>
                     <div className="flex justify-between items-center text-sm text-slate-500 mb-4 pb-4 border-b border-dashed border-slate-200">
                         <span>Receipt No:</span>
@@ -266,12 +294,32 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                     <div className="space-y-3 mb-6">
                         {lastSale.items.map((item, idx) => (
                             <div key={idx} className="flex justify-between text-sm">
-                                <span className="text-slate-600">{item.quantity} x {item.name}</span>
+                                <span className="text-slate-600 w-2/3 truncate">
+                                    {item.quantity} x {item.name}
+                                    {item.isVatExempt && <span className="ml-1 text-[9px] bg-slate-100 px-1 rounded text-slate-500">NON-VAT</span>}
+                                </span>
                                 <span className="font-bold text-slate-800">฿{(item.price * item.quantity).toLocaleString()}</span>
                             </div>
                         ))}
                     </div>
-                    <div className="flex justify-between items-center text-lg font-bold text-slate-900 pt-4 border-t border-slate-100 mb-2">
+                    
+                    {/* Tax Breakdown Section */}
+                    <div className="bg-slate-50 p-3 rounded-lg mb-4 text-xs space-y-1 border border-slate-100">
+                         <div className="flex justify-between text-slate-500">
+                            <span>Vatable Base</span>
+                            <span>฿{lastSale.subtotalVatable.toFixed(2)}</span>
+                         </div>
+                         <div className="flex justify-between text-slate-500">
+                            <span>VAT (7%)</span>
+                            <span>฿{lastSale.vatAmount.toFixed(2)}</span>
+                         </div>
+                         <div className="flex justify-between text-slate-500">
+                            <span>Exempt/Non-VAT</span>
+                            <span>฿{lastSale.subtotalExempt.toFixed(2)}</span>
+                         </div>
+                    </div>
+
+                    <div className="flex justify-between items-center text-lg font-bold text-slate-900 pt-2 border-t border-slate-100 mb-2">
                         <span>Total Paid</span>
                         <span className="text-blue-600">฿{lastSale.total.toLocaleString()}</span>
                     </div>
@@ -298,8 +346,6 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                  <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                      Shift: <span className="font-bold text-slate-700">{activeShift.staffName}</span>
-                     <span className="text-slate-300">|</span>
-                     Started: {activeShift.startTime.split(' ')[1]}
                  </div>
                  <button 
                     onClick={() => { setCloseShiftActual(0); setShowCloseShiftModal(true); }}
@@ -357,20 +403,24 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                                 <Pill className="w-12 h-12 text-slate-300 group-hover:text-blue-500 transition-colors" />
                             )}
                             
+                            {/* Tags */}
+                            <div className="absolute top-2 left-2 flex flex-col gap-1">
+                                {!product.isVatExempt && (
+                                    <div className="bg-slate-800 text-white text-[9px] py-0.5 px-1.5 rounded font-bold shadow-sm">
+                                        VAT
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Warnings */}
                             {hasIssues && (
-                                <div className="absolute top-2 left-2 right-2 bg-red-500 text-white text-[10px] py-1 px-2 rounded-md font-bold text-center shadow-sm animate-pulse flex items-center justify-center gap-1">
-                                    <AlertOctagon className="w-3 h-3" /> SAFETY ALERT
+                                <div className="absolute top-2 right-2 left-auto bg-red-500 text-white text-[10px] py-1 px-2 rounded-md font-bold text-center shadow-sm animate-pulse flex items-center justify-center gap-1">
+                                    <AlertOctagon className="w-3 h-3" /> SAFETY
                                 </div>
                             )}
                             {product.requiresPrescription && !hasIssues && (
                                 <div className="absolute top-2 right-2 bg-blue-600 text-white text-[10px] py-1 px-2 rounded-md font-bold shadow-sm">
                                     Rx
-                                </div>
-                            )}
-                            {product.stock <= product.minStock && product.stock > 0 && (
-                                <div className="absolute bottom-2 left-2 bg-orange-500 text-white text-[10px] py-1 px-2 rounded-full font-bold shadow-sm">
-                                    Low Stock
                                 </div>
                             )}
                         </div>
@@ -462,7 +512,11 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                             <div className="flex-1 pr-4">
                                 <div className="flex items-center gap-2">
                                     <h4 className="font-bold text-slate-700 text-sm line-clamp-1">{item.name}</h4>
-                                    {item.requiresPrescription && <span className="bg-blue-100 text-blue-700 text-[9px] px-1.5 rounded font-bold">Rx</span>}
+                                    {!item.isVatExempt ? (
+                                         <span className="text-[9px] bg-slate-200 text-slate-600 px-1 rounded font-bold" title="VAT Included">V</span>
+                                    ) : (
+                                         <span className="text-[9px] bg-green-100 text-green-700 px-1 rounded font-bold" title="Tax Exempt">E</span>
+                                    )}
                                 </div>
                                 <div className="text-xs text-slate-500 mt-1">฿{item.price} x {item.quantity}</div>
                             </div>
@@ -483,8 +537,14 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
         </div>
 
         <div className="p-6 bg-slate-50 border-t border-slate-200">
+            {/* Tax Summary Mini-view */}
+            <div className="flex justify-between items-center mb-3 text-xs text-slate-400">
+                 <span>VAT 7%: ฿{vatAmount.toFixed(2)}</span>
+                 <span>Exempt: ฿{totalExempt.toFixed(2)}</span>
+            </div>
+
             <div className="flex justify-between items-end mb-6">
-                <span className="text-slate-500 text-sm font-medium">Net Total <span className="text-xs text-slate-400">(VAT Inc.)</span></span>
+                <span className="text-slate-500 text-sm font-medium">Net Total <span className="text-xs text-slate-400">(Inc. VAT)</span></span>
                 <span className="text-3xl font-bold text-slate-900 tracking-tight">฿{cartTotal.toLocaleString()}</span>
             </div>
             
