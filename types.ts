@@ -107,6 +107,9 @@ export interface SaleRecord {
   vatAmount: number;       
   
   paymentMethod: 'CASH' | 'QR' | 'CREDIT';
+  tenderedAmount?: number;
+  change?: number;
+
   branchId: string;
   shiftId?: string;
   prescriptionImage?: string; // Base64 or URL for GPP compliance
@@ -114,6 +117,13 @@ export interface SaleRecord {
   status: 'COMPLETED' | 'VOID';
   voidReason?: string;
   voidBy?: string;
+
+  taxInvoiceDetails?: {
+      name: string;
+      taxId: string;
+      address: string;
+      branch?: string;
+  }
 }
 
 export interface Supplier {
@@ -181,7 +191,13 @@ export interface Shift {
   startCash: number;
   expectedCash?: number; 
   actualCash?: number; 
-  totalSales: number;
+  
+  // Breakdown for reconciliation
+  totalCashSales: number;
+  totalQrSales: number;
+  totalCreditSales: number;
+  totalSales: number; // Sum of all
+
   status: 'OPEN' | 'CLOSED';
 }
 

@@ -241,6 +241,32 @@ export const MOCK_EXPENSES: Expense[] = [
 ];
 
 export const MOCK_SHIFTS: Shift[] = [
-    { id: 'S-1001', staffName: 'Staff A', startTime: '2024-05-24 08:00', endTime: '2024-05-24 16:00', startCash: 1000, expectedCash: 5400, actualCash: 5400, totalSales: 4400, status: 'CLOSED' },
-    { id: 'S-1002', staffName: 'Staff B', startTime: '2024-05-23 08:00', endTime: '2024-05-23 16:00', startCash: 1000, expectedCash: 3500, actualCash: 3450, totalSales: 2500, status: 'CLOSED' }, 
+    { 
+        id: 'S-1001', 
+        staffName: 'Staff A', 
+        startTime: '2024-05-24 08:00', 
+        endTime: '2024-05-24 16:00', 
+        startCash: 1000, 
+        expectedCash: 5400, 
+        actualCash: 5400, 
+        totalSales: 4400, 
+        totalCashSales: 4400,
+        totalQrSales: 0,
+        totalCreditSales: 0,
+        status: 'CLOSED' 
+    },
+    { 
+        id: 'S-1002', 
+        staffName: 'Staff B', 
+        startTime: '2024-05-23 08:00', 
+        endTime: '2024-05-23 16:00', 
+        startCash: 1000, 
+        expectedCash: 3500, 
+        actualCash: 3450, 
+        totalSales: 2500,
+        totalCashSales: 2500,
+        totalQrSales: 0,
+        totalCreditSales: 0, 
+        status: 'CLOSED' 
+    }, 
 ];

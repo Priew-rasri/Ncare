@@ -4,7 +4,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ncare Pharmacy ERP</title>
+    <title>Ncare</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -51,7 +51,7 @@
         body { margin: 0; padding: 0; background-color: white; }
         body * { visibility: hidden; }
         
-        /* Receipt Printing */
+        /* Thermal Receipt Printing (Default) */
         #printable-receipt, #printable-receipt * { visibility: visible; }
         #printable-receipt {
           position: absolute;
@@ -78,6 +78,23 @@
             padding: 2mm;
             text-align: center;
         }
+
+        /* Full A4 Tax Invoice Printing */
+        .print-a4 #printable-a4-invoice, .print-a4 #printable-a4-invoice * { visibility: visible; }
+        .print-a4 #printable-a4-invoice {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 210mm;
+            min-height: 297mm;
+            padding: 20mm;
+            background: white;
+            color: black;
+            font-family: 'Sarabun', sans-serif;
+            font-size: 14px;
+        }
+        .print-a4 #printable-receipt { display: none; } /* Hide slip if A4 mode */
+
         .shelf-tag .price { font-size: 32px; font-weight: bold; margin-bottom: 5px; }
         .shelf-tag .name { font-size: 14px; font-weight: bold; margin-bottom: 5px; line-height: 1.1; }
         .shelf-tag .barcode-bars { font-family: 'Libre Barcode 39', cursive; font-size: 24px; }

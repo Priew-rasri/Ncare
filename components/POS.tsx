@@ -1,7 +1,8 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { GlobalState, Product, CartItem, SaleRecord, Shift, HeldBill } from '../types';
-import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan, Edit3, Sticker, UploadCloud, FileCheck, Camera, History, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan, Edit3, Sticker, UploadCloud, FileCheck, Camera, History, AlertTriangle, FileText } from 'lucide-react';
 
 interface POSProps {
   state: GlobalState;
@@ -17,26 +18,27 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [usePoints, setUsePoints] = useState(false);
   
   // Modals
-  const [showHeldBills, setShowHeldBills] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [openShiftAmount, setOpenShiftAmount] = useState<number>(1000);
   const [closeShiftActual, setCloseShiftActual] = useState<number>(0);
   const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastSale, setLastSale] = useState<SaleRecord | null>(null);
-  const [showLabelPrint, setShowLabelPrint] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrAmount, setQrAmount] = useState(0);
   const [showRxUpload, setShowRxUpload] = useState(false);
+
+  // New Payment Modal State
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [tenderedAmount, setTenderedAmount] = useState('');
+  const [showTaxInvoiceForm, setShowTaxInvoiceForm] = useState(false);
+  const [taxDetails, setTaxDetails] = useState({ name: '', taxId: '', address: '' });
+  const [printMode, setPrintMode] = useState<'SLIP' | 'A4'>('SLIP');
 
   // Void Reason
   const [voidReason, setVoidReason] = useState('');
   const [saleToVoid, setSaleToVoid] = useState<string | null>(null);
   
-  // Instruction Editor State
-  const [editingInstructionId, setEditingInstructionId] = useState<string | null>(null);
-  const [instructionText, setInstructionText] = useState('');
-
   // Prescription Upload State
   const [prescriptionImage, setPrescriptionImage] = useState<string | null>(null);
   
@@ -57,7 +59,9 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
         // F4: Pay Cash (Shortcut)
         if (e.key === 'F4') {
              e.preventDefault();
-             if (cart.length > 0) initiatePayment('CASH');
+             if (cart.length > 0) {
+                 initiatePayment('CASH');
+             }
         }
 
         // F9: Hold Bill
@@ -245,15 +249,18 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       if (method === 'QR') {
           setQrAmount(netTotal);
           setShowQRModal(true);
+      } else if (method === 'CASH') {
+          setShowPaymentModal(true);
+          setTenderedAmount('');
       } else {
+          // Credit
           completeCheckout(method);
       }
   };
   
-  const completeCheckout = (method: 'CASH' | 'QR' | 'CREDIT') => {
+  const completeCheckout = (method: 'CASH' | 'QR' | 'CREDIT', tendered?: number, change?: number) => {
     const { total, totalExempt, totalVatable, subtotalVatableBase, vatAmount, discount, pointsToRedeem, netTotal } = calculateTotals(cart);
 
-    // Note: ID is generated in App.tsx Reducer to ensure running sequence
     const sale: SaleRecord = {
       id: 'PENDING', // Will be replaced by reducer
       date: new Date().toLocaleString('th-TH'),
@@ -266,21 +273,21 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       subtotalVatable: subtotalVatableBase,
       vatAmount: vatAmount,
       paymentMethod: method,
+      tenderedAmount: tendered,
+      change: change,
       customerId: selectedCustomerId || undefined,
       branchId: state.currentBranch.id,
       shiftId: activeShift?.id,
       prescriptionImage: prescriptionImage || undefined,
-      status: 'COMPLETED'
+      status: 'COMPLETED',
+      taxInvoiceDetails: showTaxInvoiceForm ? { ...taxDetails } : undefined
     };
 
     dispatch({ type: 'ADD_SALE', payload: sale });
     
-    // We can't know the exact ID here immediately unless we await or query, 
-    // but for the Receipt Modal we need it. 
-    // In a real app we'd wait for API response. Here we simulate looking at the store next tick.
+    // Simulate delay to get ID for printing
     setTimeout(() => {
-        // Find the latest sale
-        setLastSale(sale); // This object has 'PENDING' id, dashboard handles finding the real one or we just show 'Printed'
+        setLastSale(sale); 
         setShowReceipt(true);
     }, 100);
 
@@ -290,7 +297,21 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     setPrescriptionImage(null);
     setUsePoints(false);
     setShowQRModal(false);
+    setShowPaymentModal(false);
+    setShowTaxInvoiceForm(false);
+    setTaxDetails({ name: '', taxId: '', address: '' });
   };
+
+  const handlePrint = () => {
+      if (printMode === 'A4') {
+          document.body.classList.add('print-a4');
+      } else {
+          document.body.classList.remove('print-a4');
+      }
+      window.print();
+      // Cleanup
+      document.body.classList.remove('print-a4');
+  }
 
   const handleVoidSale = () => {
       if (!saleToVoid || !voidReason) return;
@@ -307,16 +328,6 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
           setSaleToVoid(null);
           setVoidReason('');
       }
-  };
-
-  // Shift logic...
-  const calculateShiftTotals = () => {
-      if (!activeShift) return { cash: 0, qr: 0, credit: 0, total: 0 };
-      const shiftSales = state.sales.filter(s => s.shiftId === activeShift.id && s.status === 'COMPLETED');
-      const cashSales = shiftSales.filter(s => s.paymentMethod === 'CASH').reduce((a,c) => a + c.netTotal, 0);
-      const qrSales = shiftSales.filter(s => s.paymentMethod === 'QR').reduce((a,c) => a + c.netTotal, 0);
-      const creditSales = shiftSales.filter(s => s.paymentMethod === 'CREDIT').reduce((a,c) => a + c.netTotal, 0);
-      return { cash: cashSales, qr: qrSales, credit: creditSales, total: cashSales + qrSales + creditSales };
   };
 
   const categories = ['ALL', ...Array.from(new Set(state.inventory.map(p => p.category)))];
@@ -347,7 +358,6 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       );
   }
 
-  const shiftAnalysis = calculateShiftTotals();
   const todaysSales = state.sales
         .filter(s => s.shiftId === activeShift.id)
         .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -355,6 +365,97 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-9rem)] gap-6 animate-fade-in pb-2 relative">
       
+      {/* Payment Modal */}
+      {showPaymentModal && (
+          <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 relative">
+                   <button onClick={() => setShowPaymentModal(false)} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"><X className="w-6 h-6"/></button>
+                   <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><Banknote className="w-6 h-6 text-green-600"/> Cash Payment</h3>
+                   
+                   <div className="bg-slate-50 p-4 rounded-xl mb-6 text-center">
+                       <span className="text-sm text-slate-500 font-bold uppercase">Total Amount</span>
+                       <div className="text-4xl font-bold text-slate-900">฿{netTotal.toLocaleString()}</div>
+                   </div>
+
+                   <div className="mb-6">
+                       <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cash Tendered (รับเงินมา)</label>
+                       <input 
+                          type="number" 
+                          autoFocus
+                          className="w-full p-4 text-2xl font-bold border-2 border-blue-500 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 transition-all text-right"
+                          value={tenderedAmount}
+                          onChange={(e) => setTenderedAmount(e.target.value)}
+                          placeholder="0.00"
+                       />
+                       <div className="flex gap-2 mt-2">
+                           {[100, 500, 1000].map(amt => (
+                               <button 
+                                key={amt}
+                                onClick={() => setTenderedAmount(amt.toString())}
+                                className="flex-1 py-2 bg-slate-100 rounded-lg text-sm font-bold hover:bg-slate-200 text-slate-600"
+                               >
+                                   ฿{amt}
+                               </button>
+                           ))}
+                           <button onClick={() => setTenderedAmount(netTotal.toString())} className="flex-1 py-2 bg-blue-50 rounded-lg text-sm font-bold text-blue-600 hover:bg-blue-100">Exact</button>
+                       </div>
+                   </div>
+
+                   {Number(tenderedAmount) >= netTotal && (
+                       <div className="bg-green-50 p-4 rounded-xl mb-6 flex justify-between items-center border border-green-100 animate-fade-in">
+                           <span className="text-green-700 font-bold uppercase text-sm">Change Due (เงินทอน)</span>
+                           <span className="text-2xl font-bold text-green-700">฿{(Number(tenderedAmount) - netTotal).toLocaleString()}</span>
+                       </div>
+                   )}
+
+                   {/* Full Tax Invoice Request */}
+                   <div className="mb-6">
+                       <button 
+                         onClick={() => setShowTaxInvoiceForm(!showTaxInvoiceForm)} 
+                         className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:underline"
+                       >
+                           {showTaxInvoiceForm ? <X className="w-3 h-3"/> : <FileText className="w-3 h-3"/>}
+                           {showTaxInvoiceForm ? 'Cancel Tax Invoice' : 'Request Full Tax Invoice'}
+                       </button>
+
+                       {showTaxInvoiceForm && (
+                           <div className="mt-3 space-y-3 p-3 bg-slate-50 rounded-xl border border-blue-100 animate-fade-in">
+                               <input 
+                                 className="w-full p-2 text-sm border border-slate-200 rounded-lg" 
+                                 placeholder="Company Name / Customer Name"
+                                 value={taxDetails.name}
+                                 onChange={e => setTaxDetails({...taxDetails, name: e.target.value})}
+                               />
+                               <input 
+                                 className="w-full p-2 text-sm border border-slate-200 rounded-lg" 
+                                 placeholder="Tax ID (13 Digits)"
+                                 value={taxDetails.taxId}
+                                 onChange={e => setTaxDetails({...taxDetails, taxId: e.target.value})}
+                               />
+                               <input 
+                                 className="w-full p-2 text-sm border border-slate-200 rounded-lg" 
+                                 placeholder="Address / Branch"
+                                 value={taxDetails.address}
+                                 onChange={e => setTaxDetails({...taxDetails, address: e.target.value})}
+                               />
+                           </div>
+                       )}
+                   </div>
+
+                   <button 
+                       disabled={Number(tenderedAmount) < netTotal}
+                       onClick={() => {
+                           setPrintMode(showTaxInvoiceForm ? 'A4' : 'SLIP');
+                           completeCheckout('CASH', Number(tenderedAmount), Number(tenderedAmount) - netTotal);
+                       }}
+                       className="w-full py-4 bg-green-600 text-white font-bold text-lg rounded-xl shadow-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                   >
+                       Confirm Payment
+                   </button>
+              </div>
+          </div>
+      )}
+
       {/* History / Void Modal */}
       {showHistoryModal && (
           <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -432,32 +533,143 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
           </div>
       )}
 
-      {/* Other Modals (Receipt, Close Shift, QR, etc. - simplified for brevity as they are same as before logic-wise) */}
+      {/* Receipt / Success Modal */}
       {showReceipt && lastSale && (
         <div className="absolute inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
              <div className="bg-white p-6 rounded-3xl shadow-xl max-w-sm w-full no-print">
                  <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
                  <h2 className="text-2xl font-bold text-center mb-2">Payment Successful</h2>
-                 <p className="text-center text-slate-500 mb-6">Change: ฿0.00</p>
-                 <button onClick={() => window.print()} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl mb-3 flex items-center justify-center gap-2"><Printer className="w-4 h-4"/> Print Receipt</button>
+                 <p className="text-center text-slate-500 mb-6">
+                     {lastSale.change ? `Change: ฿${lastSale.change.toLocaleString()}` : 'Completed'}
+                 </p>
+                 <button onClick={handlePrint} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl mb-3 flex items-center justify-center gap-2">
+                     <Printer className="w-4 h-4"/> {printMode === 'A4' ? 'Print Full Invoice' : 'Print Slip'}
+                 </button>
                  <button onClick={() => setShowReceipt(false)} className="w-full py-3 border border-slate-200 text-slate-600 font-bold rounded-xl">Close</button>
              </div>
-             {/* Hidden Print Area */}
+             
+             {/* Hidden Print Area: Thermal Slip */}
              <div id="printable-receipt">
                  <div className="receipt-header">
                      <div className="receipt-title">{state.settings.storeName}</div>
                      <div>TAX ID: {state.settings.taxId}</div>
                      <div>{state.settings.address}</div>
+                     <div>ABB (Tax Inv)</div>
                  </div>
                  <div className="receipt-divider"></div>
-                 <div className="receipt-row"><span>Bill: {lastSale.id}</span><span>{lastSale.date}</span></div>
+                 <div className="receipt-row"><span>Bill: {lastSale.id}</span><span>{lastSale.date.split(' ')[0]} {lastSale.date.split(' ')[1]}</span></div>
                  <div className="receipt-divider"></div>
                  {lastSale.items.map((item,i) => (
                      <div key={i} className="receipt-row"><span>{item.name} x{item.quantity}</span><span>{(item.price*item.quantity).toFixed(2)}</span></div>
                  ))}
                  <div className="receipt-divider"></div>
-                 <div className="receipt-row"><span>Total</span><span>{lastSale.netTotal.toFixed(2)}</span></div>
+                 <div className="receipt-row"><span>Total</span><span>{lastSale.total.toFixed(2)}</span></div>
+                 {lastSale.discount > 0 && <div className="receipt-row"><span>Discount</span><span>-{lastSale.discount.toFixed(2)}</span></div>}
+                 <div className="receipt-row receipt-total"><span>Net Total</span><span>{lastSale.netTotal.toFixed(2)}</span></div>
+                 <div className="receipt-divider"></div>
+                 <div className="receipt-row"><span>Before VAT</span><span>{lastSale.subtotalVatable.toFixed(2)}</span></div>
+                 <div className="receipt-row"><span>VAT 7%</span><span>{lastSale.vatAmount.toFixed(2)}</span></div>
+                 <div className="receipt-divider"></div>
+                 <div className="receipt-row"><span>Cash Tendered</span><span>{lastSale.tenderedAmount?.toFixed(2) || '-'}</span></div>
+                 <div className="receipt-row"><span>Change</span><span>{lastSale.change?.toFixed(2) || '-'}</span></div>
                  <div className="receipt-footer">Thank You</div>
+             </div>
+
+             {/* Hidden Print Area: A4 Full Tax Invoice */}
+             <div id="printable-a4-invoice" className="hidden">
+                 <div className="flex justify-between items-start mb-8">
+                     <div>
+                         <h1 className="text-2xl font-bold">{state.settings.storeName}</h1>
+                         <p className="text-sm">{state.settings.address}</p>
+                         <p className="text-sm">Tax ID: {state.settings.taxId} (Head Office)</p>
+                         <p className="text-sm">Tel: {state.settings.phone}</p>
+                     </div>
+                     <div className="text-right">
+                         <h2 className="text-xl font-bold uppercase tracking-wider mb-2">Full Tax Invoice</h2>
+                         <h2 className="text-sm font-bold uppercase tracking-wider mb-2">(ใบกำกับภาษีเต็มรูป)</h2>
+                         <p className="font-bold">No: {lastSale.id}</p>
+                         <p>Date: {lastSale.date}</p>
+                     </div>
+                 </div>
+
+                 <div className="border p-4 mb-6 rounded">
+                     <h3 className="font-bold border-b pb-2 mb-2">Customer (ผู้ซื้อสินค้า)</h3>
+                     <p><span className="font-bold">Name:</span> {lastSale.taxInvoiceDetails?.name || '-'}</p>
+                     <p><span className="font-bold">Address:</span> {lastSale.taxInvoiceDetails?.address || '-'}</p>
+                     <p><span className="font-bold">Tax ID:</span> {lastSale.taxInvoiceDetails?.taxId || '-'}</p>
+                 </div>
+
+                 <table className="w-full text-left border-collapse mb-6">
+                     <thead>
+                         <tr className="bg-gray-100 border-y border-black">
+                             <th className="py-2 px-2">#</th>
+                             <th className="py-2 px-2">Description</th>
+                             <th className="py-2 px-2 text-right">Qty</th>
+                             <th className="py-2 px-2 text-right">Unit Price</th>
+                             <th className="py-2 px-2 text-right">Amount</th>
+                         </tr>
+                     </thead>
+                     <tbody>
+                         {lastSale.items.map((item, idx) => (
+                             <tr key={idx} className="border-b border-gray-200">
+                                 <td className="py-2 px-2">{idx+1}</td>
+                                 <td className="py-2 px-2">{item.name} ({item.genericName})</td>
+                                 <td className="py-2 px-2 text-right">{item.quantity}</td>
+                                 <td className="py-2 px-2 text-right">{item.price.toFixed(2)}</td>
+                                 <td className="py-2 px-2 text-right">{(item.price * item.quantity).toFixed(2)}</td>
+                             </tr>
+                         ))}
+                     </tbody>
+                     <tfoot>
+                         <tr>
+                             <td colSpan={3}></td>
+                             <td className="py-2 px-2 text-right font-bold">Total</td>
+                             <td className="py-2 px-2 text-right font-bold">{lastSale.total.toFixed(2)}</td>
+                         </tr>
+                         <tr>
+                             <td colSpan={3}></td>
+                             <td className="py-2 px-2 text-right">Discount</td>
+                             <td className="py-2 px-2 text-right">-{lastSale.discount.toFixed(2)}</td>
+                         </tr>
+                         <tr className="bg-gray-100 border-t border-black">
+                             <td colSpan={3} className="py-2 px-2 font-bold">{/* Text Value could go here */}</td>
+                             <td className="py-2 px-2 text-right font-bold">Net Total</td>
+                             <td className="py-2 px-2 text-right font-bold">{lastSale.netTotal.toFixed(2)}</td>
+                         </tr>
+                     </tfoot>
+                 </table>
+
+                 <div className="flex justify-end mb-12">
+                     <div className="w-1/2">
+                         <div className="flex justify-between border-b py-1">
+                             <span>Vatable Amount</span>
+                             <span>{lastSale.subtotalVatable.toFixed(2)}</span>
+                         </div>
+                         <div className="flex justify-between border-b py-1">
+                             <span>VAT 7%</span>
+                             <span>{lastSale.vatAmount.toFixed(2)}</span>
+                         </div>
+                         <div className="flex justify-between border-b py-1">
+                             <span>Exempt Amount</span>
+                             <span>{lastSale.subtotalExempt.toFixed(2)}</span>
+                         </div>
+                         <div className="flex justify-between py-1 font-bold">
+                             <span>Grand Total</span>
+                             <span>{lastSale.netTotal.toFixed(2)}</span>
+                         </div>
+                     </div>
+                 </div>
+
+                 <div className="flex justify-between mt-12 text-center">
+                     <div>
+                         <div className="border-b border-black w-40 mb-2"></div>
+                         <p className="text-sm">Received By</p>
+                     </div>
+                     <div>
+                         <div className="border-b border-black w-40 mb-2"></div>
+                         <p className="text-sm">Authorized Signature</p>
+                     </div>
+                 </div>
              </div>
         </div>
       )}

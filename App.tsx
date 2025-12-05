@@ -119,12 +119,15 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             note: `POS Sale: ${newSaleId}`
         }));
 
-        // 3. Update Shift
+        // 3. Update Shift with Breakdown
         let updatedShift = state.activeShift;
-        if (updatedShift && saleRecord.paymentMethod === 'CASH') {
+        if (updatedShift) {
              updatedShift = {
                  ...updatedShift,
-                 totalSales: updatedShift.totalSales + saleRecord.netTotal
+                 totalSales: updatedShift.totalSales + saleRecord.netTotal,
+                 totalCashSales: saleRecord.paymentMethod === 'CASH' ? updatedShift.totalCashSales + saleRecord.netTotal : updatedShift.totalCashSales,
+                 totalQrSales: saleRecord.paymentMethod === 'QR' ? updatedShift.totalQrSales + saleRecord.netTotal : updatedShift.totalQrSales,
+                 totalCreditSales: saleRecord.paymentMethod === 'CREDIT' ? updatedShift.totalCreditSales + saleRecord.netTotal : updatedShift.totalCreditSales,
              };
         }
 
@@ -204,12 +207,15 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             note: `Void Bill: ${saleId} (${reason})`
         }));
 
-        // 4. Deduct from Shift if CASH
+        // 4. Deduct from Shift (Reverse breakdown)
         let shiftAfterVoid = state.activeShift;
-        if (shiftAfterVoid && saleToVoid.paymentMethod === 'CASH') {
+        if (shiftAfterVoid) {
             shiftAfterVoid = {
                 ...shiftAfterVoid,
-                totalSales: shiftAfterVoid.totalSales - saleToVoid.netTotal
+                totalSales: shiftAfterVoid.totalSales - saleToVoid.netTotal,
+                totalCashSales: saleToVoid.paymentMethod === 'CASH' ? shiftAfterVoid.totalCashSales - saleToVoid.netTotal : shiftAfterVoid.totalCashSales,
+                totalQrSales: saleToVoid.paymentMethod === 'QR' ? shiftAfterVoid.totalQrSales - saleToVoid.netTotal : shiftAfterVoid.totalQrSales,
+                totalCreditSales: saleToVoid.paymentMethod === 'CREDIT' ? shiftAfterVoid.totalCreditSales - saleToVoid.netTotal : shiftAfterVoid.totalCreditSales,
             };
         }
 
@@ -343,6 +349,9 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             startTime: new Date().toLocaleString(),
             startCash: action.payload.startCash,
             totalSales: 0,
+            totalCashSales: 0,
+            totalQrSales: 0,
+            totalCreditSales: 0,
             status: 'OPEN'
         };
         return { ...state, activeShift: newShift };
@@ -354,7 +363,8 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             endTime: new Date().toLocaleString(),
             status: 'CLOSED',
             actualCash: action.payload.actualCash,
-            expectedCash: state.activeShift.startCash + state.activeShift.totalSales
+            // Expected Cash is Start + Cash Sales Only
+            expectedCash: state.activeShift.startCash + state.activeShift.totalCashSales
         };
         return { 
             ...state, 
