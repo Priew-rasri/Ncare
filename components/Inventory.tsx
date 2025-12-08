@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { GlobalState, TransferRequest, Product, ProductCategory, Batch } from '../types';
-import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight, TrendingUp, PieChart, Truck, ArrowLeftRight, Printer, Tag, FileText, AlertOctagon, Plus, Edit, Trash2, Upload } from 'lucide-react';
+import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight, TrendingUp, PieChart, Truck, ArrowLeftRight, Printer, Tag, FileText, AlertOctagon, Plus, Edit, Trash2, Upload, FileDown } from 'lucide-react';
 
 interface InventoryProps {
   data: GlobalState;
@@ -162,6 +162,21 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
       }
   };
 
+  const handleDownloadTemplate = () => {
+      const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + 
+      "Barcode,Product Name,Sell Price,Cost Price,Initial Stock,Min Stock\n" +
+      "8851234567890,Paracetamol 500mg,15,8,100,20\n" +
+      "8850987654321,Vitamin C 1000mg,350,200,50,10";
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "ncare_product_import_template.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  };
+
   const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -269,6 +284,9 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                 className="hidden" 
                 accept=".csv"
             />
+            <button onClick={handleDownloadTemplate} className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 rounded-lg text-xs font-bold transition-colors" title="Download CSV Template">
+                <FileDown className="w-4 h-4" /> Template
+            </button>
             <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg text-sm font-bold transition-colors">
                 <Upload className="w-4 h-4" /> Import CSV
             </button>

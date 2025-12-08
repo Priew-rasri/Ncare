@@ -9,6 +9,7 @@ import Accounting from './components/Accounting';
 import AIAssistant from './components/AIAssistant';
 import Settings from './components/Settings';
 import Login from './components/Login';
+import QueueBoard from './components/QueueBoard';
 import { MOCK_INVENTORY, MOCK_SALES, MOCK_PO, MOCK_EXPENSES, MOCK_BRANCHES, MOCK_SUPPLIERS, MOCK_STOCK_LOGS, MOCK_SETTINGS, MOCK_SHIFTS } from './constants';
 import { GlobalState, Action, StockLog, Shift, Customer, SystemLog, TransferRequest, Notification, SaleRecord } from './types';
 import { Search, Bell, MapPin, ChevronDown, Menu, AlertTriangle, Truck, Clock } from 'lucide-react';
@@ -493,6 +494,12 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             }, ...state.systemLogs]
         };
 
+    case 'TOGGLE_QUEUE_MODE':
+        return {
+            ...state,
+            isQueueMode: action.payload
+        };
+
     case 'UPDATE_CART_INSTRUCTION':
         return state; 
 
@@ -517,7 +524,8 @@ const initialState: GlobalState = {
   activeShift: null,
   shiftHistory: MOCK_SHIFTS,
   heldBills: [],
-  transfers: MOCK_TRANSFERS
+  transfers: MOCK_TRANSFERS,
+  isQueueMode: false
 };
 
 const App: React.FC = () => {
@@ -537,7 +545,7 @@ const App: React.FC = () => {
                   transfers: parsed.transfers || MOCK_TRANSFERS,
                   sales: parsed.sales || MOCK_SALES 
               };
-              dispatch({ type: 'LOAD_STATE', payload: { ...mergedState, currentUser: null, activeShift: parsed.activeShift } }); 
+              dispatch({ type: 'LOAD_STATE', payload: { ...mergedState, currentUser: null, activeShift: parsed.activeShift, isQueueMode: false } }); 
           } catch (e) {
               console.error("Failed to load persistence");
           }
@@ -589,7 +597,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard data={state} />;
+        return <Dashboard data={state} dispatch={dispatch} />;
       case 'pos':
         return <POS state={state} dispatch={dispatch} />;
       case 'inventory':
@@ -605,12 +613,17 @@ const App: React.FC = () => {
         if (state.currentUser?.role === 'STAFF') return <div className="text-center p-10 text-slate-500">Access Denied: Requires Manager Privileges</div>;
         return <Settings data={state} dispatch={dispatch} />;
       default:
-        return <Dashboard data={state} />;
+        return <Dashboard data={state} dispatch={dispatch} />;
     }
   };
 
   if (!state.currentUser) {
       return <Login onLogin={(user) => dispatch({ type: 'LOGIN', payload: user })} />;
+  }
+
+  // --- QUEUE MODE OVERRIDE ---
+  if (state.isQueueMode) {
+      return <QueueBoard data={state} onClose={() => dispatch({ type: 'TOGGLE_QUEUE_MODE', payload: false })} />;
   }
 
   return (

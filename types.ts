@@ -267,6 +267,7 @@ export interface GlobalState {
   settings: Settings;
   heldBills: HeldBill[];
   transfers: TransferRequest[];
+  isQueueMode: boolean; // For Queue Display Board
 }
 
 export type Action =
@@ -294,4 +295,5 @@ export type Action =
   | { type: 'LOG_SYSTEM_EVENT'; payload: Omit<SystemLog, 'id' | 'timestamp'> }
   | { type: 'REQUEST_TRANSFER'; payload: TransferRequest }
   | { type: 'ADD_PRODUCT'; payload: Product }
-  | { type: 'EDIT_PRODUCT'; payload: Product };
+  | { type: 'EDIT_PRODUCT'; payload: Product }
+  | { type: 'TOGGLE_QUEUE_MODE'; payload: boolean };

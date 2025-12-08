@@ -15,13 +15,14 @@ import {
   Cell
 } from 'recharts';
 import { GlobalState } from '../types';
-import { ArrowUpRight, ArrowDownRight, Users, DollarSign, PackageCheck, AlertTriangle, Filter, Clock, TrendingUp, MonitorPlay, PieChart as PieIcon } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Users, DollarSign, PackageCheck, AlertTriangle, Filter, Clock, TrendingUp, MonitorPlay, PieChart as PieIcon, ExternalLink } from 'lucide-react';
 
 interface DashboardProps {
   data: GlobalState;
+  dispatch: React.Dispatch<any>;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ data }) => {
+const Dashboard: React.FC<DashboardProps> = ({ data, dispatch }) => {
   // --- Real-time Data Calculation ---
 
   // 1. Calculate Total Metrics
@@ -270,7 +271,12 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
                     )}
                 </div>
                 <div className="mt-4 text-center">
-                    <button className="text-xs font-bold text-slate-300 hover:text-white underline">Manage Queue</button>
+                    <button 
+                        onClick={() => dispatch({ type: 'TOGGLE_QUEUE_MODE', payload: true })}
+                        className="text-xs font-bold text-blue-300 hover:text-white flex items-center justify-center gap-2 mx-auto hover:bg-white/10 px-3 py-2 rounded-lg transition-all"
+                    >
+                        <ExternalLink className="w-3 h-3" /> Launch Queue Screen (TV)
+                    </button>
                 </div>
             </div>
 
