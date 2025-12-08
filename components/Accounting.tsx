@@ -123,7 +123,9 @@ const Accounting: React.FC<AccountingProps> = ({ data, dispatch }) => {
             s.subtotalExempt.toFixed(2)
         ]);
         
-        const csvContent = "data:text/csv;charset=utf-8," 
+        // Add BOM for Thai Excel compatibility
+        const BOM = "\uFEFF";
+        const csvContent = "data:text/csv;charset=utf-8," + BOM
             + headers.join(",") + "\n" 
             + rows.map(e => e.join(",")).join("\n");
             

@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { GlobalState, TransferRequest, Product, ProductCategory, Batch } from '../types';
-import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight, TrendingUp, PieChart, Truck, ArrowLeftRight, Printer, Tag, FileText, AlertOctagon, Plus, Edit, Trash2 } from 'lucide-react';
+import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight, TrendingUp, PieChart, Truck, ArrowLeftRight, Printer, Tag, FileText, AlertOctagon, Plus, Edit, Trash2, Upload } from 'lucide-react';
 
 interface InventoryProps {
   data: GlobalState;
@@ -24,6 +24,9 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productForm, setProductForm] = useState<Partial<Product>>({});
   const [editableBatches, setEditableBatches] = useState<Batch[]>([]);
+
+  // CSV Import
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Shelf Tag Printing State
   const [showTagModal, setShowTagModal] = useState(false);
@@ -159,6 +162,66 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
       }
   };
 
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+          const csvText = event.target?.result as string;
+          const lines = csvText.split('\n');
+          let successCount = 0;
+          
+          // Skip header row
+          for (let i = 1; i < lines.length; i++) {
+              const line = lines[i].trim();
+              if (!line) continue;
+              
+              const [barcode, name, price, cost, stock, minStock] = line.split(',');
+              
+              // Basic Validation
+              if (barcode && name && price) {
+                  // Check duplicate
+                  if (data.inventory.some(p => p.barcode === barcode.trim())) continue;
+
+                  const newProduct: Product = {
+                      id: `P-IMP-${Date.now()}-${i}`,
+                      barcode: barcode.trim(),
+                      name: name.trim(),
+                      genericName: name.trim(), // Default
+                      category: ProductCategory.PAIN_FEVER, // Default
+                      manufacturer: 'Imported',
+                      location: 'General',
+                      price: parseFloat(price) || 0,
+                      cost: parseFloat(cost) || 0,
+                      stock: parseInt(stock) || 0,
+                      minStock: parseInt(minStock) || 10,
+                      unit: 'Unit',
+                      requiresPrescription: false,
+                      isVatExempt: false,
+                      batches: [] // Should create a batch for initial stock ideally
+                  };
+                  
+                  // If stock > 0, create a batch
+                  if (newProduct.stock > 0) {
+                      newProduct.batches.push({
+                          lotNumber: 'IMP-INIT',
+                          expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+                          quantity: newProduct.stock,
+                          costPrice: newProduct.cost
+                      });
+                  }
+
+                  dispatch({ type: 'ADD_PRODUCT', payload: newProduct });
+                  successCount++;
+              }
+          }
+          alert(`Successfully imported ${successCount} products.`);
+      };
+      reader.readAsText(file);
+      e.target.value = ''; // Reset
+  };
+
   const getFilteredInventory = () => {
       return data.inventory.filter(item => 
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -199,6 +262,16 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
              />
           </div>
           <div className="flex gap-2">
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleImportCSV} 
+                className="hidden" 
+                accept=".csv"
+            />
+            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg text-sm font-bold transition-colors">
+                <Upload className="w-4 h-4" /> Import CSV
+            </button>
             <button onClick={handleOpenAddProduct} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-md hover:bg-blue-700 transition-colors">
                 <Plus className="w-4 h-4" /> Add Product
             </button>
