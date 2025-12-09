@@ -29,7 +29,9 @@ export interface User {
     username: string;
     name: string;
     role: UserRole;
+    email?: string;
     avatar?: string;
+    branchId?: string;
 }
 
 export interface Batch {
