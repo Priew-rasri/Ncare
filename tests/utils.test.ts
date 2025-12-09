@@ -152,7 +152,7 @@ describe('Currency Formatting', () => {
 
 describe('Barcode Validation', () => {
   it('should validate correct EAN-13 barcodes', () => {
-    expect(validateEAN13('8850123456789')).toBe(true);
+    expect(validateEAN13('8850123456787')).toBe(true); // Fixed: correct checksum
     expect(validateEAN13('5901234123457')).toBe(true);
   });
 

@@ -29,7 +29,7 @@ const MOCK_TRANSFERS: TransferRequest[] = [
 // Helper to generate running numbers: INV-YYMM-XXXX
 const generateDocId = (prefix: string, sales: SaleRecord[]): string => {
     const now = new Date();
-    const year = now.getFullYear().toString().substr(-2);
+    const year = now.getFullYear().toString().slice(-2);
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const prefixDate = `${prefix}-${year}${month}-`;
     
@@ -318,7 +318,7 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             const poItem = po.items.find(i => i.productId === product.id);
             if (poItem) {
                 const newBatch = {
-                    lotNumber: `LOT-${Date.now().toString().substr(-6)}`,
+                    lotNumber: `LOT-${Date.now().toString().slice(-6)}`,
                     expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0],
                     quantity: poItem.quantity,
                     costPrice: poItem.unitCost
