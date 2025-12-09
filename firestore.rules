@@ -1,0 +1,208 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && getUserData().role == role;
+    }
+
+    function isOwner() {
+      return hasRole('OWNER');
+    }
+
+    function isPharmacist() {
+      return hasRole('PHARMACIST');
+    }
+
+    function isStaff() {
+      return hasRole('STAFF');
+    }
+
+    function belongsToBranch(branchId) {
+      return isAuthenticated() && getUserData().branchId == branchId;
+    }
+
+    // ==================== USERS ====================
+    match /users/{userId} {
+      // Anyone authenticated can read user data
+      allow read: if isAuthenticated();
+
+      // Only owner can create users
+      allow create: if isOwner();
+
+      // Users can update their own profile, or owner can update anyone
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isOwner());
+
+      // Only owner can delete users
+      allow delete: if isOwner();
+    }
+
+    // ==================== PRODUCTS ====================
+    match /products/{productId} {
+      // All authenticated users can read products
+      allow read: if isAuthenticated();
+
+      // Only owner and pharmacist can create/update products
+      allow create, update: if isOwner() || isPharmacist();
+
+      // Only owner can delete products
+      allow delete: if isOwner();
+    }
+
+    // ==================== CUSTOMERS ====================
+    match /customers/{customerId} {
+      // All authenticated users can read and create customers
+      allow read, create: if isAuthenticated();
+
+      // All authenticated users can update customer points/data
+      allow update: if isAuthenticated();
+
+      // Only owner can delete customers
+      allow delete: if isOwner();
+    }
+
+    // ==================== SALES ====================
+    match /sales/{saleId} {
+      // All authenticated users can read sales
+      allow read: if isAuthenticated();
+
+      // All authenticated users can create sales
+      allow create: if isAuthenticated();
+
+      // Only owner and pharmacist can void/update sales
+      allow update: if isOwner() || isPharmacist();
+
+      // Only owner can delete sales
+      allow delete: if isOwner();
+    }
+
+    // ==================== PURCHASE ORDERS ====================
+    match /purchaseOrders/{poId} {
+      // All authenticated users can read POs
+      allow read: if isAuthenticated();
+
+      // Only owner and pharmacist can create POs
+      allow create: if isOwner() || isPharmacist();
+
+      // Only owner and pharmacist can update POs
+      allow update: if isOwner() || isPharmacist();
+
+      // Only owner can delete POs
+      allow delete: if isOwner();
+    }
+
+    // ==================== SUPPLIERS ====================
+    match /suppliers/{supplierId} {
+      // All authenticated users can read suppliers
+      allow read: if isAuthenticated();
+
+      // Only owner can create/update/delete suppliers
+      allow create, update, delete: if isOwner();
+    }
+
+    // ==================== STOCK LOGS ====================
+    match /stockLogs/{logId} {
+      // All authenticated users can read stock logs
+      allow read: if isAuthenticated();
+
+      // All authenticated users can create stock logs
+      allow create: if isAuthenticated();
+
+      // No one can update or delete stock logs (audit trail)
+      allow update, delete: if false;
+    }
+
+    // ==================== SYSTEM LOGS ====================
+    match /systemLogs/{logId} {
+      // All authenticated users can read system logs
+      allow read: if isAuthenticated();
+
+      // System can create logs
+      allow create: if isAuthenticated();
+
+      // No one can update or delete system logs (audit trail)
+      allow update, delete: if false;
+    }
+
+    // ==================== EXPENSES ====================
+    match /expenses/{expenseId} {
+      // Only owner and pharmacist can read expenses
+      allow read: if isOwner() || isPharmacist();
+
+      // Only owner can create/update/delete expenses
+      allow create, update, delete: if isOwner();
+    }
+
+    // ==================== SHIFTS ====================
+    match /shifts/{shiftId} {
+      // All authenticated users can read shifts
+      allow read: if isAuthenticated();
+
+      // All authenticated users can create/update shifts
+      allow create, update: if isAuthenticated();
+
+      // Only owner can delete shifts
+      allow delete: if isOwner();
+    }
+
+    // ==================== TRANSFERS ====================
+    match /transfers/{transferId} {
+      // All authenticated users can read transfers
+      allow read: if isAuthenticated();
+
+      // All authenticated users can create transfer requests
+      allow create: if isAuthenticated();
+
+      // Only owner and pharmacist can update transfers (approve/reject)
+      allow update: if isOwner() || isPharmacist();
+
+      // Only owner can delete transfers
+      allow delete: if isOwner();
+    }
+
+    // ==================== HELD BILLS ====================
+    match /heldBills/{billId} {
+      // All authenticated users can read held bills
+      allow read: if isAuthenticated();
+
+      // All authenticated users can create/update/delete held bills
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // ==================== SETTINGS ====================
+    match /settings/{settingsId} {
+      // All authenticated users can read settings
+      allow read: if isAuthenticated();
+
+      // Only owner can update settings
+      allow update: if isOwner();
+
+      // No one can delete settings
+      allow delete: if false;
+    }
+
+    // ==================== BRANCHES ====================
+    match /branches/{branchId} {
+      // All authenticated users can read branches
+      allow read: if isAuthenticated();
+
+      // Only owner can create/update/delete branches
+      allow create, update, delete: if isOwner();
+    }
+
+    // ==================== DEFAULT DENY ====================
+    // Deny all other operations by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

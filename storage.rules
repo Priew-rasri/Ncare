@@ -1,0 +1,82 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper function to check authentication
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check file size (max 10MB)
+    function isValidSize() {
+      return request.resource.size < 10 * 1024 * 1024;
+    }
+
+    // Helper function to check if file is an image
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    // ==================== PRESCRIPTION IMAGES ====================
+    match /prescriptions/{userId}/{prescriptionId} {
+      // Anyone authenticated can read
+      allow read: if isAuthenticated();
+
+      // Users can upload their own prescriptions
+      allow create: if isAuthenticated()
+                    && request.auth.uid == userId
+                    && isImage()
+                    && isValidSize();
+
+      // No updates or deletes (keep for compliance)
+      allow update, delete: if false;
+    }
+
+    // ==================== PRODUCT IMAGES ====================
+    match /products/{productId} {
+      // Anyone authenticated can read
+      allow read: if isAuthenticated();
+
+      // Authenticated users can upload product images
+      allow create, update: if isAuthenticated()
+                            && isImage()
+                            && isValidSize();
+
+      // Only authenticated users can delete
+      allow delete: if isAuthenticated();
+    }
+
+    // ==================== USER AVATARS ====================
+    match /avatars/{userId} {
+      // Anyone authenticated can read
+      allow read: if isAuthenticated();
+
+      // Users can upload/update their own avatar
+      allow create, update: if isAuthenticated()
+                            && request.auth.uid == userId
+                            && isImage()
+                            && request.resource.size < 2 * 1024 * 1024; // 2MB max
+
+      // Users can delete their own avatar
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ==================== RECEIPTS (for archival) ====================
+    match /receipts/{branchId}/{receiptId} {
+      // Authenticated users can read receipts from their branch
+      allow read: if isAuthenticated();
+
+      // System can create receipts
+      allow create: if isAuthenticated()
+                    && request.resource.contentType == 'application/pdf';
+
+      // No updates or deletes (keep for compliance)
+      allow update, delete: if false;
+    }
+
+    // ==================== DEFAULT DENY ====================
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
