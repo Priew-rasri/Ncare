@@ -118,7 +118,7 @@ test.describe('POS System - Critical Flows', () => {
 
     // Resume bill
     await page.click('text=Held Bills');
-    await page.click('button:has-text("Resume")').first();
+    await page.locator('button:has-text("Resume")').first().click();
 
     // Cart should have the product again
     await expect(page.getByText('Sara')).toBeVisible();
