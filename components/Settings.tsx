@@ -37,6 +37,7 @@ const Settings: React.FC<SettingsProps> = ({ data, dispatch }) => {
         link.href = url;
         link.click();
         URL.revokeObjectURL(url);
+        dispatch({ type: 'SHOW_TOAST', payload: { type: 'SUCCESS', message: 'Backup Downloaded' } });
     };
 
     const handleRestoreClick = () => {
@@ -53,10 +54,9 @@ const Settings: React.FC<SettingsProps> = ({ data, dispatch }) => {
                 const json = JSON.parse(event.target?.result as string);
                 if (window.confirm("WARNING: This will overwrite all current data with the backup file. Are you sure?")) {
                     dispatch({ type: 'IMPORT_DATA', payload: json });
-                    alert("Database restored successfully!");
                 }
             } catch (err) {
-                alert("Error parsing backup file. Please ensure it is a valid Ncare JSON backup.");
+                dispatch({ type: 'SHOW_TOAST', payload: { type: 'ERROR', message: 'Invalid Backup File' } });
             }
         };
         reader.readAsText(file);

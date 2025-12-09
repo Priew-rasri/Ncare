@@ -243,7 +243,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const addToCart = (product: Product) => {
     const existingQty = cart.find(x => x.id === product.id)?.quantity || 0;
     if (existingQty + 1 > product.stock) {
-        alert(`❌ Insufficient Stock! Available: ${product.stock}`);
+        dispatch({ type: 'SHOW_TOAST', payload: { type: 'ERROR', message: `Insufficient Stock! Available: ${product.stock}` } });
         return;
     }
 
@@ -286,6 +286,11 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       }
       return [...prev, { ...product, quantity: 1, instruction: product.defaultInstruction || 'รับประทานตามแพทย์สั่ง' }];
     });
+    
+    // Add visual feedback
+    if (!interactingItem) {
+        dispatch({ type: 'SHOW_TOAST', payload: { type: 'SUCCESS', message: `Added ${product.name}` } });
+    }
   };
 
   const removeFromCart = (id: string) => {
@@ -305,7 +310,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       if (item.id === id) {
         const newQty = item.quantity + delta;
         if (delta > 0 && newQty > item.stock) {
-            alert(`Cannot exceed available stock (${item.stock})`);
+            dispatch({ type: 'SHOW_TOAST', payload: { type: 'ERROR', message: `Cannot exceed available stock (${item.stock})` } });
             return item;
         }
         if (newQty < 1) return item;
@@ -332,7 +337,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                if (item && newQty <= item.stock) {
                    setCart(prev => prev.map(i => i.id === editingQtyId ? { ...i, quantity: newQty } : i));
                } else if (item) {
-                   alert(`Cannot exceed available stock (${item.stock})`);
+                   dispatch({ type: 'SHOW_TOAST', payload: { type: 'ERROR', message: `Cannot exceed available stock (${item.stock})` } });
                }
           }
       }
@@ -365,6 +370,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const handleDeleteHeldBill = (id: string) => {
       if(window.confirm("Delete this held bill?")) {
           dispatch({ type: 'DELETE_HELD_BILL', payload: id });
+          dispatch({ type: 'SHOW_TOAST', payload: { type: 'INFO', message: 'Held Bill Deleted' } });
       }
   }
 
@@ -391,6 +397,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const saveInstruction = () => {
       setCart(prev => prev.map(item => item.id === editingInstructionId ? { ...item, instruction: tempInstruction } : item));
       setEditingInstructionId(null);
+      dispatch({ type: 'SHOW_TOAST', payload: { type: 'SUCCESS', message: 'Instruction Updated' } });
   };
 
   // Pre-payment Validation Check

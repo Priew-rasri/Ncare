@@ -113,7 +113,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
 
   const handleSaveProduct = () => {
       if (!productForm.name || !productForm.price || !productForm.barcode) {
-          alert("Please fill in required fields (Name, Barcode, Price)");
+          dispatch({ type: 'SHOW_TOAST', payload: { type: 'ERROR', message: 'Please fill required fields (Name, Barcode, Price)' } });
           return;
       }
 
@@ -124,7 +124,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
       );
 
       if (isDuplicate) {
-          alert(`Error: Barcode "${productForm.barcode}" is already used by another product.`);
+          dispatch({ type: 'SHOW_TOAST', payload: { type: 'ERROR', message: `Barcode "${productForm.barcode}" is already in use` } });
           return;
       }
 
@@ -180,6 +180,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      dispatch({ type: 'SHOW_TOAST', payload: { type: 'SUCCESS', message: 'Template Downloaded' } });
   };
 
   const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -236,7 +237,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
                   successCount++;
               }
           }
-          alert(`Successfully imported ${successCount} products.`);
+          dispatch({ type: 'SHOW_TOAST', payload: { type: 'SUCCESS', message: `Imported ${successCount} products successfully` } });
       };
       reader.readAsText(file);
       e.target.value = ''; // Reset

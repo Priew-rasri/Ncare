@@ -261,6 +261,13 @@ export interface Notification {
     read: boolean;
 }
 
+// Toast Notification Type
+export interface ToastMessage {
+    id: string;
+    type: 'SUCCESS' | 'ERROR' | 'INFO' | 'WARNING';
+    message: string;
+}
+
 export interface GlobalState {
   currentUser: User | null; // Auth
   inventory: Product[];
@@ -279,6 +286,7 @@ export interface GlobalState {
   heldBills: HeldBill[];
   transfers: TransferRequest[];
   isQueueMode: boolean; // For Queue Display Board
+  toast: ToastMessage | null; // Global Toast State
 }
 
 export type Action =
@@ -308,4 +316,6 @@ export type Action =
   | { type: 'REQUEST_TRANSFER'; payload: TransferRequest }
   | { type: 'ADD_PRODUCT'; payload: Product }
   | { type: 'EDIT_PRODUCT'; payload: Product }
-  | { type: 'TOGGLE_QUEUE_MODE'; payload: boolean };
+  | { type: 'TOGGLE_QUEUE_MODE'; payload: boolean }
+  | { type: 'SHOW_TOAST'; payload: { type: 'SUCCESS' | 'ERROR' | 'INFO' | 'WARNING'; message: string } }
+  | { type: 'HIDE_TOAST' };

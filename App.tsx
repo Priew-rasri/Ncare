@@ -10,6 +10,7 @@ import AIAssistant from './components/AIAssistant';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import QueueBoard from './components/QueueBoard';
+import Toast from './components/Toast';
 import { MOCK_INVENTORY, MOCK_SALES, MOCK_PO, MOCK_EXPENSES, MOCK_BRANCHES, MOCK_SUPPLIERS, MOCK_STOCK_LOGS, MOCK_SETTINGS, MOCK_SHIFTS } from './constants';
 import { GlobalState, Action, StockLog, Shift, Customer, SystemLog, TransferRequest, Notification, SaleRecord } from './types';
 import { Search, Bell, MapPin, ChevronDown, Menu, AlertTriangle, Truck, Clock } from 'lucide-react';
@@ -109,7 +110,8 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
                 action: 'DB_RESTORE',
                 details: 'Database restored from backup file',
                 severity: 'CRITICAL'
-            }, ...(action.payload.systemLogs || [])]
+            }, ...(action.payload.systemLogs || [])],
+            toast: { id: `T-${Date.now()}`, type: 'SUCCESS', message: 'Database Restored Successfully' }
         };
         
     case 'ADD_SALE':
@@ -194,7 +196,8 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
         inventory: updatedInventoryFEFO, // Use the FEFO updated inventory
         stockLogs: [...newLogs, ...state.stockLogs],
         activeShift: updatedShift,
-        customers: updatedCustomers
+        customers: updatedCustomers,
+        toast: { id: `T-${Date.now()}`, type: 'SUCCESS', message: 'Payment Completed Successfully' }
       };
     
     case 'VOID_SALE':
@@ -269,7 +272,8 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
                 action: 'VOID_TRANSACTION',
                 details: `Voided Bill ${saleId}: ${reason}`,
                 severity: 'WARNING'
-            }, ...state.systemLogs]
+            }, ...state.systemLogs],
+            toast: { id: `T-${Date.now()}`, type: 'WARNING', message: `Bill ${saleId} Voided` }
         };
 
     case 'UPDATE_STOCK':
@@ -304,7 +308,8 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
                 ? { ...p, stock: p.stock + action.payload.quantity }
                 : p
             ),
-            stockLogs: [adjustmentLog, ...state.stockLogs]
+            stockLogs: [adjustmentLog, ...state.stockLogs],
+            toast: { id: `T-${Date.now()}`, type: 'INFO', message: 'Stock Adjusted' }
         };
 
     case 'UPDATE_CUSTOMER_POINTS':
@@ -319,7 +324,8 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
     case 'ADD_PO':
         return {
             ...state,
-            purchaseOrders: [action.payload, ...state.purchaseOrders]
+            purchaseOrders: [action.payload, ...state.purchaseOrders],
+            toast: { id: `T-${Date.now()}`, type: 'SUCCESS', message: 'Purchase Order Created' }
         };
     case 'RECEIVE_PO':
         const po = state.purchaseOrders.find(p => p.id === action.payload.poId);
@@ -362,12 +368,13 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             ...state,
             purchaseOrders: updatedPOs,
             inventory: updatedInventory,
-            stockLogs: [...receiveLogs, ...state.stockLogs]
+            stockLogs: [...receiveLogs, ...state.stockLogs],
+            toast: { id: `T-${Date.now()}`, type: 'SUCCESS', message: 'Goods Received Successfully' }
         };
 
     case 'SWITCH_BRANCH':
         const newBranch = state.branches.find(b => b.id === action.payload);
-        return newBranch ? { ...state, currentBranch: newBranch } : state;
+        return newBranch ? { ...state, currentBranch: newBranch, toast: { id: `T-${Date.now()}`, type: 'INFO', message: `Switched to ${newBranch.name}` } } : state;
         
     case 'OPEN_SHIFT':
         const newShift: Shift = {
@@ -382,7 +389,7 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             cashTransactions: [],
             status: 'OPEN'
         };
-        return { ...state, activeShift: newShift };
+        return { ...state, activeShift: newShift, toast: { id: `T-${Date.now()}`, type: 'SUCCESS', message: 'Shift Opened' } };
         
     case 'CLOSE_SHIFT':
         if (!state.activeShift) return state;
@@ -401,7 +408,8 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
         return { 
             ...state, 
             activeShift: null, 
-            shiftHistory: [closedShift, ...state.shiftHistory] 
+            shiftHistory: [closedShift, ...state.shiftHistory],
+            toast: { id: `T-${Date.now()}`, type: 'SUCCESS', message: 'Shift Closed' }
         };
     
     case 'ADD_CASH_TRANSACTION':
@@ -419,7 +427,8 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             activeShift: {
                 ...state.activeShift,
                 cashTransactions: [...state.activeShift.cashTransactions, newTx]
-            }
+            },
+            toast: { id: `T-${Date.now()}`, type: 'INFO', message: 'Cash Transaction Recorded' }
         };
         
     case 'UPDATE_SETTINGS':
@@ -433,19 +442,22 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
                 action: 'SETTINGS_UPDATE',
                 details: 'Updated global store settings',
                 severity: 'WARNING'
-            }, ...state.systemLogs]
+            }, ...state.systemLogs],
+            toast: { id: `T-${Date.now()}`, type: 'SUCCESS', message: 'Settings Saved' }
         };
 
     case 'HOLD_BILL':
         return {
             ...state,
-            heldBills: [...state.heldBills, action.payload]
+            heldBills: [...state.heldBills, action.payload],
+            toast: { id: `T-${Date.now()}`, type: 'INFO', message: 'Bill Held' }
         };
 
     case 'RESUME_BILL':
         return {
             ...state,
-            heldBills: state.heldBills.filter(b => b.id !== action.payload)
+            heldBills: state.heldBills.filter(b => b.id !== action.payload),
+            toast: { id: `T-${Date.now()}`, type: 'INFO', message: 'Bill Resumed' }
         };
 
     case 'DELETE_HELD_BILL':
@@ -475,7 +487,8 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
                 action: 'STOCK_TRANSFER_REQUEST',
                 details: `Requested ${action.payload.quantity} of ${action.payload.productName} from ${action.payload.fromBranchId}`,
                 severity: 'INFO'
-            }, ...state.systemLogs]
+            }, ...state.systemLogs],
+            toast: { id: `T-${Date.now()}`, type: 'SUCCESS', message: 'Transfer Request Sent' }
         };
 
     case 'ADD_PRODUCT':
@@ -492,7 +505,8 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
         return {
             ...state,
             inventory: [...state.inventory, action.payload],
-            stockLogs: [newProductLog, ...state.stockLogs]
+            stockLogs: [newProductLog, ...state.stockLogs],
+            toast: { id: `T-${Date.now()}`, type: 'SUCCESS', message: 'Product Created Successfully' }
         };
 
     case 'EDIT_PRODUCT':
@@ -506,7 +520,8 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
                 action: 'EDIT_PRODUCT',
                 details: `Edited product details: ${action.payload.name}`,
                 severity: 'INFO'
-            }, ...state.systemLogs]
+            }, ...state.systemLogs],
+            toast: { id: `T-${Date.now()}`, type: 'SUCCESS', message: 'Product Updated' }
         };
 
     case 'TOGGLE_QUEUE_MODE':
@@ -517,6 +532,18 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
 
     case 'UPDATE_CART_INSTRUCTION':
         return state; 
+        
+    case 'SHOW_TOAST':
+        return {
+            ...state,
+            toast: { id: `T-${Date.now()}`, ...action.payload }
+        };
+        
+    case 'HIDE_TOAST':
+        return {
+            ...state,
+            toast: null
+        };
 
     default:
       return state;
@@ -540,7 +567,8 @@ const initialState: GlobalState = {
   shiftHistory: MOCK_SHIFTS,
   heldBills: [],
   transfers: MOCK_TRANSFERS,
-  isQueueMode: false
+  isQueueMode: false,
+  toast: null
 };
 
 const App: React.FC = () => {
@@ -642,7 +670,15 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#f3f4f6] font-sans text-slate-900">
+    <div className="flex min-h-screen bg-[#f3f4f6] font-sans text-slate-900 relative">
+      {/* Global Toast Notification */}
+      {state.toast && (
+          <Toast 
+            toast={state.toast} 
+            onClose={() => dispatch({ type: 'HIDE_TOAST' })} 
+          />
+      )}
+
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
       <main className="flex-1 ml-72 flex flex-col h-screen overflow-hidden">
