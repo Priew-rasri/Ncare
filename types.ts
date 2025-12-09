@@ -109,6 +109,15 @@ export interface HeldBill {
     note?: string;
 }
 
+export interface ClinicalCheck {
+    isRightPatient: boolean;
+    isRightDrug: boolean;
+    isDoseCorrect: boolean;
+    allergyChecked: boolean;
+    counselingComplete: boolean;
+    pharmacistName: string;
+}
+
 export interface SaleRecord {
   id: string; // Format: INV-YYMM-XXXX
   queueNumber?: string; // Format: A001
@@ -136,6 +145,8 @@ export interface SaleRecord {
   status: 'COMPLETED' | 'VOID';
   voidReason?: string;
   voidBy?: string;
+
+  clinicalCheck?: ClinicalCheck; // Pharmacist verification
 
   taxInvoiceDetails?: {
       name: string;
@@ -274,6 +285,7 @@ export type Action =
   | { type: 'LOGIN'; payload: User }
   | { type: 'LOGOUT' }
   | { type: 'LOAD_STATE'; payload: GlobalState } 
+  | { type: 'RESET_STATE' }
   | { type: 'IMPORT_DATA'; payload: GlobalState }
   | { type: 'ADD_SALE'; payload: SaleRecord }
   | { type: 'VOID_SALE'; payload: { saleId: string; reason: string; user: string } }

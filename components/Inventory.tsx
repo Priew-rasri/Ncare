@@ -1,17 +1,22 @@
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { GlobalState, TransferRequest, Product, ProductCategory, Batch } from '../types';
-import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight, TrendingUp, PieChart, Truck, ArrowLeftRight, Printer, Tag, FileText, AlertOctagon, Plus, Edit, Trash2, Upload, FileDown } from 'lucide-react';
+import { Search, Filter, AlertTriangle, CheckCircle, Download, ChevronDown, ChevronUp, Package, Box, RefreshCw, History, MapPin, Barcode, Settings, Save, X, Calendar, ArrowRight, TrendingUp, PieChart, Truck, ArrowLeftRight, Printer, Tag, FileText, AlertOctagon, Plus, Edit, Trash2, Upload, FileDown, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface InventoryProps {
   data: GlobalState;
   dispatch: React.Dispatch<any>;
 }
 
+const ITEMS_PER_PAGE = 10;
+
 const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
   const [activeTab, setActiveTab] = useState<'STOCK' | 'MOVEMENT' | 'TRANSFERS' | 'EXPIRY' | 'VALUATION'>('STOCK');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
   
   // Modals
   const [showAdjustModal, setShowAdjustModal] = useState(false);
@@ -237,12 +242,23 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
       e.target.value = ''; // Reset
   };
 
-  const getFilteredInventory = () => {
+  const filteredInventory = useMemo(() => {
       return data.inventory.filter(item => 
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         item.barcode.includes(searchTerm)
       );
-  };
+  }, [data.inventory, searchTerm]);
+
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredInventory.length / ITEMS_PER_PAGE);
+  const currentItems = useMemo(() => {
+      const start = (currentPage - 1) * ITEMS_PER_PAGE;
+      return filteredInventory.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredInventory, currentPage]);
+
+  useEffect(() => {
+      setCurrentPage(1);
+  }, [searchTerm]);
   
   // Running Balance Calculation for Stock Card
   const getStockCardData = (productId: string) => {
@@ -316,7 +332,7 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {getFilteredInventory().map((item) => (
+              {currentItems.map((item) => (
                 <React.Fragment key={item.id}>
                     <tr 
                         className={`hover:bg-slate-50 cursor-pointer ${expandedRow === item.id ? 'bg-slate-50' : ''} ${item.stock <= item.minStock ? 'bg-red-50/80 border-l-4 border-l-red-500' : ''}`} 
@@ -401,6 +417,29 @@ const Inventory: React.FC<InventoryProps> = ({ data, dispatch }) => {
               ))}
             </tbody>
           </table>
+          
+          {/* Pagination */}
+           <div className="p-4 border-t border-slate-100 flex justify-between items-center bg-slate-50/50">
+               <div className="text-xs text-slate-500">
+                   Showing <span className="font-bold">{((currentPage - 1) * ITEMS_PER_PAGE) + 1}</span> to <span className="font-bold">{Math.min(currentPage * ITEMS_PER_PAGE, filteredInventory.length)}</span> of <span className="font-bold">{filteredInventory.length}</span> items
+               </div>
+               <div className="flex gap-2">
+                   <button 
+                       disabled={currentPage === 1}
+                       onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                       className="p-1.5 bg-white border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-50"
+                   >
+                       <ChevronLeft className="w-4 h-4 text-slate-600"/>
+                   </button>
+                   <button 
+                       disabled={currentPage === totalPages}
+                       onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                       className="p-1.5 bg-white border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-50"
+                   >
+                       <ChevronRight className="w-4 h-4 text-slate-600"/>
+                   </button>
+               </div>
+           </div>
         </div>
       </div>
   );

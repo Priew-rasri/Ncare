@@ -1,12 +1,14 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { GlobalState, Product, CartItem, SaleRecord, Shift, HeldBill } from '../types';
-import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan, Edit3, Sticker, UploadCloud, FileCheck, Camera, History, AlertTriangle, FileText, Briefcase, Coins, ArrowRightLeft, MousePointerClick, Tag, LogOut, Keyboard, HelpCircle } from 'lucide-react';
+import { GlobalState, Product, CartItem, SaleRecord, Shift, HeldBill, ClinicalCheck } from '../types';
+import { Search, Plus, Minus, Trash2, CreditCard, QrCode, Banknote, User, ShieldCheck, ShoppingBag, Pill, Stethoscope, ChevronRight, CheckCircle, Barcode, Printer, Lock, LogIn, AlertOctagon, X, Percent, PauseCircle, PlayCircle, Clock, Gift, Scan, Edit3, Sticker, UploadCloud, FileCheck, Camera, History, AlertTriangle, FileText, Briefcase, Coins, ArrowRightLeft, MousePointerClick, Tag, LogOut, Keyboard, HelpCircle, ChevronLeft } from 'lucide-react';
 
 interface POSProps {
   state: GlobalState;
   dispatch: React.Dispatch<any>;
 }
+
+const ITEMS_PER_PAGE = 12;
 
 const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,6 +19,9 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [usePoints, setUsePoints] = useState(false);
   const [doctorName, setDoctorName] = useState('');
   
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+
   // Modals
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [openShiftAmount, setOpenShiftAmount] = useState<number>(1000);
@@ -32,6 +37,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   const [showCashOpsModal, setShowCashOpsModal] = useState(false);
   const [showHeldBillsModal, setShowHeldBillsModal] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [showClinicalCheckModal, setShowClinicalCheckModal] = useState(false);
 
   // Instruction Editor
   const [editingInstructionId, setEditingInstructionId] = useState<string | null>(null);
@@ -57,6 +63,16 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   // Prescription Upload State
   const [prescriptionImage, setPrescriptionImage] = useState<string | null>(null);
   
+  // Clinical Check State
+  const [clinicalCheck, setClinicalCheck] = useState<ClinicalCheck>({
+      isRightPatient: false,
+      isRightDrug: false,
+      isDoseCorrect: false,
+      allergyChecked: false,
+      counselingComplete: false,
+      pharmacistName: state.currentUser?.name || ''
+  });
+
   // Direct Quantity Edit State
   const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
   const [tempQty, setTempQty] = useState('');
@@ -103,6 +119,7 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
             setShowHeldBillsModal(false);
             setShowCashOpsModal(false);
             setShowShortcutsModal(false);
+            setShowClinicalCheckModal(false);
         }
     };
 
@@ -145,14 +162,28 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
   [state.customers, selectedCustomerId]);
 
   const filteredProducts = useMemo(() => {
-    return state.inventory.filter(p => {
+    const filtered = state.inventory.filter(p => {
         const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                               p.genericName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                               p.barcode.includes(searchTerm);
         const matchesCat = activeCategory === 'ALL' || p.category === activeCategory;
         return matchesSearch && matchesCat;
     });
+    return filtered;
   }, [state.inventory, searchTerm, activeCategory]);
+
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
+  const currentProducts = useMemo(() => {
+      const start = (currentPage - 1) * ITEMS_PER_PAGE;
+      return filteredProducts.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredProducts, currentPage]);
+
+  // Reset page when filter changes
+  useEffect(() => {
+      setCurrentPage(1);
+  }, [searchTerm, activeCategory]);
+
 
   const activeShift = state.activeShift;
 
@@ -362,11 +393,20 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       setEditingInstructionId(null);
   };
 
+  // Pre-payment Validation Check
   const initiatePayment = (method: 'CASH' | 'QR' | 'CREDIT') => {
       if (cart.length === 0) return;
       
+      // Clinical Check required for Rx items
       if (needsPrescription && !prescriptionImage) {
           setShowRxUpload(true);
+          return;
+      }
+
+      // Check for High Alert or Dangerous Drugs for Clinical Check
+      const hasRxItems = cart.some(i => i.requiresPrescription);
+      if (hasRxItems && !clinicalCheck.isRightDrug) { // If not checked yet
+          setShowClinicalCheckModal(true);
           return;
       }
 
@@ -414,7 +454,8 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
       prescriptionImage: prescriptionImage || undefined,
       doctorName: doctorName || undefined,
       status: 'COMPLETED',
-      taxInvoiceDetails: showTaxInvoiceForm ? { ...taxDetails } : undefined
+      taxInvoiceDetails: showTaxInvoiceForm ? { ...taxDetails } : undefined,
+      clinicalCheck: needsPrescription ? clinicalCheck : undefined
     };
 
     dispatch({ type: 'ADD_SALE', payload: sale });
@@ -434,6 +475,15 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
     setShowPaymentModal(false);
     setShowTaxInvoiceForm(false);
     setTaxDetails({ name: '', taxId: '', address: '' });
+    // Reset clinical check
+    setClinicalCheck({
+        isRightPatient: false,
+        isRightDrug: false,
+        isDoseCorrect: false,
+        allergyChecked: false,
+        counselingComplete: false,
+        pharmacistName: state.currentUser?.name || ''
+    });
   };
 
   const handleCloseShift = () => {
@@ -606,6 +656,70 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                  </div>
              </div>
         </div>
+      )}
+
+      {/* Clinical Check Modal */}
+      {showClinicalCheckModal && (
+          <div className="absolute inset-0 z-[60] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-6 border-4 border-blue-500">
+                  <div className="text-center mb-6">
+                      <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Stethoscope className="w-8 h-8 text-blue-600" />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900">Pharmacist Clinical Verification</h3>
+                      <p className="text-slate-500 text-sm">Mandatory check for prescription drugs (GPP)</p>
+                  </div>
+
+                  <div className="space-y-3 mb-6">
+                      {[
+                          { id: 'isRightPatient', label: 'Right Patient (ผู้ป่วยถูกต้อง)' },
+                          { id: 'isRightDrug', label: 'Right Drug (ยาถูกต้องตามอาการ)' },
+                          { id: 'isDoseCorrect', label: 'Right Dose & Frequency (ขนาดยาเหมาะสม)' },
+                          { id: 'allergyChecked', label: 'Allergy Check (ตรวจสอบประวัติแพ้ยา)' },
+                          { id: 'counselingComplete', label: 'Counseling Provided (อธิบายวิธีใช้ยา)' }
+                      ].map(check => (
+                          <label key={check.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                              <input 
+                                  type="checkbox" 
+                                  className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                                  checked={(clinicalCheck as any)[check.id]}
+                                  onChange={(e) => setClinicalCheck({...clinicalCheck, [check.id]: e.target.checked})}
+                              />
+                              <span className="font-bold text-slate-700">{check.label}</span>
+                          </label>
+                      ))}
+                  </div>
+                  
+                  <div className="mb-6">
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Dispensed By (Pharmacist Name)</label>
+                      <input 
+                          type="text" 
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                          value={clinicalCheck.pharmacistName}
+                          onChange={(e) => setClinicalCheck({...clinicalCheck, pharmacistName: e.target.value})}
+                      />
+                  </div>
+
+                  <div className="flex gap-3">
+                      <button 
+                          disabled={!Object.values(clinicalCheck).every(Boolean)}
+                          onClick={() => {
+                              setShowClinicalCheckModal(false);
+                              initiatePayment('CASH'); // Resume payment flow
+                          }}
+                          className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                          Verify & Proceed
+                      </button>
+                      <button 
+                          onClick={() => setShowClinicalCheckModal(false)}
+                          className="py-3 px-6 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200"
+                      >
+                          Cancel
+                      </button>
+                  </div>
+              </div>
+          </div>
       )}
 
       {/* QR Payment Modal */}
@@ -1193,10 +1307,10 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
             </div>
         </div>
         
-        {/* Product Grid */}
+        {/* Product Grid with Pagination */}
         <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5">
-            {filteredProducts.map(product => {
+            {currentProducts.map(product => {
                 const inCartQty = cart.find(c => c.id === product.id)?.quantity || 0;
                 const isOutOfStock = product.stock <= inCartQty;
                 return (
@@ -1231,6 +1345,27 @@ const POS: React.FC<POSProps> = ({ state, dispatch }) => {
                 );
             })}
           </div>
+          
+          {/* Pagination Controls */}
+          {filteredProducts.length > ITEMS_PER_PAGE && (
+              <div className="flex justify-center items-center mt-8 gap-4">
+                  <button 
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className="p-2 bg-white border border-slate-200 rounded-lg disabled:opacity-50 hover:bg-slate-50"
+                  >
+                      <ChevronLeft className="w-5 h-5 text-slate-600" />
+                  </button>
+                  <span className="text-sm font-bold text-slate-600">Page {currentPage} of {totalPages}</span>
+                  <button 
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    className="p-2 bg-white border border-slate-200 rounded-lg disabled:opacity-50 hover:bg-slate-50"
+                  >
+                      <ChevronRight className="w-5 h-5 text-slate-600" />
+                  </button>
+              </div>
+          )}
         </div>
       </div>
 

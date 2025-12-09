@@ -80,7 +80,22 @@ const reducer = (state: GlobalState, action: Action): GlobalState => {
             }, ...state.systemLogs]
         };
     case 'LOAD_STATE':
-        return action.payload;
+        // Robust data migration logic
+        const loadedState = action.payload;
+        return {
+            ...loadedState,
+            // Ensure arrays exist
+            transfers: loadedState.transfers || [],
+            heldBills: loadedState.heldBills || [],
+            // Ensure settings schema is up to date
+            settings: {
+                ...state.settings, // defaults
+                ...loadedState.settings
+            }
+        };
+
+    case 'RESET_STATE':
+        return initialState;
         
     case 'IMPORT_DATA':
         // Restore everything but keep the current user session if needed

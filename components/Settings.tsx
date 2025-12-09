@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { GlobalState, Settings as SettingsType } from '../types';
-import { Save, Store, Receipt, Printer, Info, CheckCircle, Shield, FileText, Database, Download, Upload, AlertTriangle, Coins } from 'lucide-react';
+import { Save, Store, Receipt, Printer, Info, CheckCircle, Shield, FileText, Database, Download, Upload, AlertTriangle, Coins, RefreshCw } from 'lucide-react';
 
 interface SettingsProps {
     data: GlobalState;
@@ -62,6 +62,14 @@ const Settings: React.FC<SettingsProps> = ({ data, dispatch }) => {
         reader.readAsText(file);
         // Reset input
         e.target.value = ''; 
+    };
+
+    const handleFactoryReset = () => {
+        if (window.confirm("CRITICAL WARNING: This will DELETE ALL DATA and reset the system to factory defaults. This action cannot be undone.\n\nAre you absolutely sure?")) {
+            dispatch({ type: 'RESET_STATE' });
+            localStorage.removeItem('pharmaflow_db_v1');
+            window.location.reload();
+        }
     };
 
     const renderGeneral = () => (
@@ -238,7 +246,7 @@ const Settings: React.FC<SettingsProps> = ({ data, dispatch }) => {
                  </div>
              </div>
              
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                  <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 flex flex-col items-center text-center hover:shadow-md transition-all">
                      <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4">
                          <Download className="w-8 h-8" />
@@ -267,8 +275,19 @@ const Settings: React.FC<SettingsProps> = ({ data, dispatch }) => {
                          Select File to Restore
                      </button>
                      <div className="mt-4 flex items-center gap-2 text-[10px] text-red-500 font-bold bg-red-50 px-3 py-1 rounded-full">
-                         <AlertTriangle className="w-3 h-3" /> Warning: Overwrites current data
+                         <AlertTriangle className="w-3 h-3" /> Overwrites current data
                      </div>
+                 </div>
+
+                 <div className="bg-red-50 rounded-xl p-6 border border-red-200 flex flex-col items-center text-center hover:shadow-md transition-all relative overflow-hidden">
+                     <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
+                         <RefreshCw className="w-8 h-8" />
+                     </div>
+                     <h4 className="font-bold text-red-800 mb-2">Factory Reset</h4>
+                     <p className="text-xs text-red-600 mb-6">Wipe all data and restore system to initial factory state. Irreversible.</p>
+                     <button onClick={handleFactoryReset} className="w-full py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-200">
+                         Reset System Data
+                     </button>
                  </div>
              </div>
         </div>
